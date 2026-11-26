@@ -1,0 +1,8 @@
+# Only Go sources go into the build context.
+signoz/
+scenarios/
+scripts/
+.env
+*.md
+Dockerfile
+compose.yaml
