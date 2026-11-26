@@ -25,3 +25,6 @@ All notable changes to this project are documented here. The format follows
 - Dependabot updates for GitHub Actions and Go modules.
 - Demo lab: `mockpay`, a fake external payment provider whose failure mode
   (healthy, outage, slow, suspended, ratelimit) can be switched while it runs.
+- Demo lab: `storefront`, `orders-service` and `wallet-service`, traced with
+  OpenTelemetry end to end, with a staged code bug in orders-service for the
+  bad-deploy scenario (S1).

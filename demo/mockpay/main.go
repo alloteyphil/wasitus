@@ -10,14 +10,14 @@
 //
 // Settings come from environment variables:
 //
-//	MOCKPAY_ADDR        listen address (default ":8080")
+//	MOCKPAY_ADDR        listen address (default ":8090")
 //	MOCKPAY_MODE        starting mode (default "healthy")
 //	MOCKPAY_SLOW_DELAY  delay in slow mode (default "6s")
 //	MOCKPAY_RATE_LIMIT  charges per minute in ratelimit mode (default 60)
 //
 // Switch modes at runtime:
 //
-//	curl -X PUT localhost:8080/admin/mode -d '{"mode": "outage"}'
+//	curl -X PUT localhost:8090/admin/mode -d '{"mode": "outage"}'
 package main
 
 import (
@@ -43,7 +43,7 @@ func main() {
 
 func run(log *slog.Logger) error {
 	cfg := DefaultConfig()
-	addr := envOr("MOCKPAY_ADDR", ":8080")
+	addr := envOr("MOCKPAY_ADDR", ":8090")
 	mode, err := parseMode(envOr("MOCKPAY_MODE", string(ModeHealthy)))
 	if err != nil {
 		return fmt.Errorf("MOCKPAY_MODE: %w", err)
