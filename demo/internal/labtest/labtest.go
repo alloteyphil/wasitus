@@ -46,7 +46,7 @@ func OnlySpan(t testing.TB, rec *tracetest.SpanRecorder, kind trace.SpanKind) sd
 func Attr(s sdktrace.ReadOnlySpan, key string) string {
 	for _, kv := range s.Attributes() {
 		if string(kv.Key) == key {
-			return kv.Value.Emit()
+			return kv.Value.String()
 		}
 	}
 	return ""
@@ -61,9 +61,9 @@ func Exception(s sdktrace.ReadOnlySpan) (typ, msg string, ok bool) {
 		for _, kv := range e.Attributes {
 			switch kv.Key {
 			case "exception.type":
-				typ = kv.Value.Emit()
+				typ = kv.Value.String()
 			case "exception.message":
-				msg = kv.Value.Emit()
+				msg = kv.Value.String()
 			}
 		}
 		return typ, msg, true
