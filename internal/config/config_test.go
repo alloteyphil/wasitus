@@ -52,7 +52,10 @@ func TestParseFullConfig(t *testing.T) {
 }
 
 func TestParseDefaults(t *testing.T) {
-	c, err := Parse([]byte("sources:\n  changes_file: /abs/changes.yaml\n"), "/ignored")
+	// "/abs/changes.yaml" is absolute on Linux and macOS but not on Windows,
+	// which needs a drive letter. t.TempDir() is absolute on every OS.
+	abs := filepath.Join(t.TempDir(), "changes.yaml")
+	c, err := Parse([]byte("sources:\n  changes_file: '"+abs+"'\n"), "/ignored")
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
@@ -62,7 +65,7 @@ func TestParseDefaults(t *testing.T) {
 	if c.Lookback != 60*time.Minute {
 		t.Errorf("Lookback = %s, want 60m", c.Lookback)
 	}
-	if got := c.ChangesFilePath(); got != "/abs/changes.yaml" {
+	if got := c.ChangesFilePath(); got != abs {
 		t.Errorf("ChangesFilePath() = %q, absolute path should be kept", got)
 	}
 }
