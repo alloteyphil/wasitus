@@ -19,6 +19,13 @@ type Bucket struct {
 const (
 	day = 24 * time.Hour
 
+	// maxBucketSize bounds BucketSize. The baseline looks at the same time of
+	// day give or take one bucket, so a wide bucket blurs which time of day it
+	// compares. From 12 hours up it is wrong as well as blurred: the buckets
+	// either side of one day reach into the next day's, so a single day of
+	// history would count as two towards MinBaselineSamples.
+	maxBucketSize = time.Hour
+
 	// maxBaselineDays bounds BaselineDays. A baseline longer than a quarter
 	// mostly measures growth rather than normal load, and the bound keeps the
 	// work Analyze does proportional to its input.
@@ -28,8 +35,9 @@ const (
 // Config tunes spike detection. Start from DefaultConfig and change what you
 // need; Analyze refuses a Config that does not pass Validate.
 type Config struct {
-	// BucketSize is the width of one bucket. It must divide 24 hours exactly,
-	// so that a time of day falls on the same bucket boundary every day.
+	// BucketSize is the width of one bucket, at most one hour. It must divide
+	// 24 hours exactly, so that a time of day falls on the same bucket
+	// boundary every day.
 	BucketSize time.Duration
 
 	// SpikeFactor is how many times the expected requests the window must
@@ -70,8 +78,11 @@ func (c Config) Validate() error {
 	var errs []error
 	add := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
 
-	if c.BucketSize <= 0 || day%c.BucketSize != 0 {
+	switch {
+	case c.BucketSize <= 0 || day%c.BucketSize != 0:
 		add("bucket size must be positive and divide 24h exactly, got %s", c.BucketSize)
+	case c.BucketSize > maxBucketSize:
+		add("bucket size must be at most %s, got %s", maxBucketSize, c.BucketSize)
 	}
 	if math.IsNaN(c.SpikeFactor) || math.IsInf(c.SpikeFactor, 0) || c.SpikeFactor <= 1 {
 		add("spike factor must be a finite number greater than 1, got %g", c.SpikeFactor)
