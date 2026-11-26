@@ -1,0 +1,44 @@
+[
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/deployments/9002/statuses/2",
+    "id": 2,
+    "node_id": "DES_fixture2",
+    "state": "success",
+    "creator": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "description": "orders-service is live",
+    "environment": "lab",
+    "target_url": "",
+    "log_url": "https://example.com/lab/deploys/9002",
+    "environment_url": "https://example.com/lab",
+    "created_at": "2026-11-26T17:12:00Z",
+    "updated_at": "2026-11-26T17:12:00Z",
+    "deployment_url": "https://api.github.com/repos/alloteyphil/wasitus/deployments/9002",
+    "repository_url": "https://api.github.com/repos/alloteyphil/wasitus"
+  },
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/deployments/9002/statuses/1",
+    "id": 1,
+    "node_id": "DES_fixture1",
+    "state": "in_progress",
+    "creator": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "description": "Deploying orders-service",
+    "environment": "lab",
+    "target_url": "",
+    "log_url": "https://example.com/lab/deploys/9002",
+    "environment_url": "",
+    "created_at": "2026-11-26T17:10:00Z",
+    "updated_at": "2026-11-26T17:10:00Z",
+    "deployment_url": "https://api.github.com/repos/alloteyphil/wasitus/deployments/9002",
+    "repository_url": "https://api.github.com/repos/alloteyphil/wasitus"
+  }
+]
