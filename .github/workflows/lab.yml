@@ -1,0 +1,49 @@
+# Lab smoke test: starts the whole demo lab (SigNoz and the lab services) with
+# Docker on a GitHub runner, then runs demo/scripts/smoke.sh, which checks that
+# checkouts work, a staged provider failure gives 502s, and the traces reach
+# SigNoz. It runs only when the lab changes (a path filter), plus weekly.
+#
+# It is not one of the checks GitHub requires, because a required check that
+# does not run (no lab change) would block every other PR. scripts/pr-green.sh
+# still refuses to merge while it is failing or pending on a PR.
+name: lab
+
+on:
+  pull_request:
+    paths: ["demo/**", "Makefile", ".github/workflows/lab.yml"]
+  push:
+    branches: [main]
+    paths: ["demo/**", "Makefile", ".github/workflows/lab.yml"]
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC, after ci.yml
+  workflow_dispatch: # a "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lab-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    name: lab smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # a stuck container should not hold a runner for hours
+    steps:
+      - uses: actions/checkout@v7
+      # GitHub's Ubuntu runners come with Docker and Compose installed.
+      - name: Start the lab (SigNoz + services)
+        run: make lab-up
+      - name: Smoke test
+        run: demo/scripts/smoke.sh
+      # `if: failure()` runs only when an earlier step failed: the logs you
+      # need to debug it, without cluttering green runs.
+      - name: Container status and logs
+        if: failure()
+        run: |
+          make lab-ps
+          docker compose -f demo/compose.yaml logs --tail=80
+      - name: Stop the lab
+        if: always()
+        run: make lab-reset
