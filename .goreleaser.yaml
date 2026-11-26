@@ -1,0 +1,57 @@
+# GoReleaser builds and publishes releases. Used by .github/workflows/release.yml
+# (on a version tag) and by the "release dry run" job in ci.yml (every PR).
+# Try it locally without publishing: goreleaser release --snapshot --clean
+version: 2
+
+project_name: wasitus
+
+builds:
+  - main: ./cmd/wasitus
+    binary: wasitus
+    env:
+      - CGO_ENABLED=0 # static binaries that run without a C library
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath] # no local file paths inside the binary
+    ldflags:
+      # -s -w drop debug symbols; -X sets `version` in cmd/wasitus/main.go
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}" # same source, same binary
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [README.md, CHANGELOG.md, LICENSE]
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+# Release notes come from conventional commit messages since the last tag.
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other changes
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci"
+      - "^chore"
+      - "^Merge pull request"
+
+release:
+  prerelease: auto # tags like v0.2.0-rc.1 are marked as pre-releases
