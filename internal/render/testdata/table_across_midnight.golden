@@ -1,0 +1,8 @@
+Window: 2026-11-14 00:30 -> 2026-11-14 04:00 UTC (plus 2h lookback)
+
+TIME          KIND      SOURCE        SERVICE         EVENT
+Nov 13 23:10  change    github        -               Late-night config change
+Nov 14 02:31  change    github        orders-service  Merged PR #12: refactor order validation
+Nov 14 02:47  change    github        orders-service  Deploy orders-service v1.4.0
+Nov 14 03:05  external  changes-file  -               mockpay status page: degraded payments
+Nov 14 03:09  symptom   signoz        wallet-service  Alert FIRED: High 5xx rate

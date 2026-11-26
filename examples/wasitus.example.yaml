@@ -1,0 +1,20 @@
+# Example wasitus config. Copy it to wasitus.yaml and edit.
+# Secrets never go in this file: they are read from the environment variables
+# named below.
+
+timezone: Africa/Accra   # used to read and show times; storage is always UTC
+lookback: 60m            # also collect this long before --from
+
+sources:
+  changes_file: changes.yaml   # manual notes; relative to this file
+
+  # Coming in M2:
+  # signoz:
+  #   url: http://localhost:8080
+  #   api_key_env: SIGNOZ_API_KEY
+  # github:
+  #   token_env: GITHUB_TOKEN    # fine-grained, read-only
+  #   repos: [alloteyphil/wasitus]
+
+services:                      # repository -> telemetry service name
+  alloteyphil/wasitus: orders-service

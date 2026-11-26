@@ -1,0 +1,7 @@
+Window: 2026-11-14 03:00 -> 2026-11-14 04:00 Africa/Accra (plus 60m lookback)
+
+TIME   KIND      SOURCE        SERVICE         EVENT
+02:31  change    changes-file  orders-service  Merged PR #12: refactor order validation
+02:47  change    changes-file  orders-service  Deployed orders-service v1.4.0 to the lab
+03:05  external  changes-file  -               mockpay status page: degraded payments
+03:20  change    changes-file  wallet-service  Restarted wallet-service
