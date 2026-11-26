@@ -12,8 +12,15 @@ sources:
   # signoz:
   #   url: http://localhost:8080
   #   api_key_env: SIGNOZ_API_KEY
+
+  # GitHub: merged pull requests, deployments and releases in the window
+  # become change events. Commented out so this example runs offline (the
+  # tests run it); uncomment it to read real repositories. The token must be a
+  # read-only, fine-grained token with Pull requests, Deployments and Contents
+  # (for releases) set to read. If the variable is missing or empty, wasitus
+  # stops with an error instead of calling GitHub without it.
   # github:
-  #   token_env: GITHUB_TOKEN    # fine-grained, read-only
+  #   token_env: GITHUB_TOKEN    # name of the variable, never the token itself
   #   repos: [alloteyphil/wasitus]
 
 services:                      # repository -> telemetry service name

@@ -1,0 +1,112 @@
+# The demo lab: SigNoz plus a small fake company that calls a fake provider.
+#
+#   make lab-up       build and start everything, wait until healthy
+#   make lab-down     stop (data is kept)
+#   make lab-reset    stop and delete all lab data
+#
+#   storefront   http://localhost:8000/checkout     the customers' way in
+#   mockpay      http://localhost:8090/admin/mode   switch the provider's failure mode
+#   SigNoz       http://localhost:8080              traces and logs
+#
+# Service names double as host names inside Docker's network, so
+# orders-service reaches wallet-service at http://wallet-service:8082.
+name: wasitus-lab
+
+# SigNoz lives in its own file (see signoz/README.md); `include` starts it as
+# part of this project and lets these services join its network.
+include:
+  - signoz/compose.yaml
+
+services:
+  mockpay:
+    build:
+      context: .
+      args: { APP: mockpay }
+    image: wasitus-lab/mockpay:dev
+    # No OTEL settings on purpose: mockpay plays an outside company, and
+    # wasitus may only see it through our own services' telemetry.
+    environment:
+      MOCKPAY_ADDR: ":8090"
+      MOCKPAY_MODE: healthy
+    ports: ["127.0.0.1:8090:8090"] # this machine only: /admin/mode has no auth
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [signoz-network]
+    restart: unless-stopped
+
+  wallet-service:
+    build:
+      context: .
+      args: { APP: services/wallet }
+    image: wasitus-lab/wallet-service:dev
+    environment:
+      LAB_ADDR: ":8082"
+      APP_VERSION: "1.0.0"
+      MOCKPAY_URL: http://mockpay:8090
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-ingester:4318
+    depends_on:
+      mockpay: { condition: service_healthy }
+      ingester: { condition: service_started }
+      # The migrator is a one-off job. Waiting for it to *complete* also tells
+      # `docker compose up --wait` not to expect it to keep running; without
+      # this, a restart (migrations already done, job exits at once) fails.
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [signoz-network]
+    restart: unless-stopped
+
+  orders-service:
+    build:
+      context: .
+      args: { APP: services/orders }
+    image: wasitus-lab/orders-service:dev
+    environment:
+      LAB_ADDR: ":8081"
+      # A staged "deploy" (scenario S1) recreates this container with a new
+      # version and the bug switched on:
+      #   ORDERS_VERSION=1.4.0 ORDERS_BUG_EVERY=5 docker compose up -d orders-service
+      APP_VERSION: ${ORDERS_VERSION:-1.3.0}
+      ORDERS_BUG_EVERY: ${ORDERS_BUG_EVERY:-0}
+      WALLET_URL: http://wallet-service:8082
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-ingester:4318
+    depends_on:
+      wallet-service: { condition: service_healthy }
+      ingester: { condition: service_started }
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [signoz-network]
+    restart: unless-stopped
+
+  storefront:
+    build:
+      context: .
+      args: { APP: services/storefront }
+    image: wasitus-lab/storefront:dev
+    environment:
+      LAB_ADDR: ":8080"
+      APP_VERSION: "1.0.0"
+      ORDERS_URL: http://orders-service:8081
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-ingester:4318
+    ports: ["127.0.0.1:8000:8080"]
+    depends_on:
+      orders-service: { condition: service_healthy }
+      ingester: { condition: service_started }
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [signoz-network]
+    restart: unless-stopped
