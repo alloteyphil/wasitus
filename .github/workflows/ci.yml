@@ -91,6 +91,28 @@ jobs:
         with:
           version: v2.15.0
 
+  demo:
+    name: demo lab (tidy, vet, test, lint)
+    runs-on: ubuntu-latest
+    # The lab is its own Go module (docs/adr/0006-demo-separate-module.md), so
+    # `go test ./...` at the root skips it. `defaults` runs every `run` step
+    # in this job from demo/.
+    defaults:
+      run:
+        working-directory: demo
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: demo/go.mod
+      - run: go mod tidy -diff
+      - run: go vet ./...
+      - run: go test -race -count=1 -timeout 2m ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          working-directory: demo
+
   workflows:
     name: lint workflows
     runs-on: ubuntu-latest

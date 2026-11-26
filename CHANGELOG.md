@@ -23,3 +23,5 @@ All notable changes to this project are documented here. The format follows
 - Release workflow: pushing a `v*` tag publishes a GitHub Release with binaries
   for macOS, Linux and Windows (amd64 and arm64) and checksums.
 - Dependabot updates for GitHub Actions and Go modules.
+- Demo lab: `mockpay`, a fake external payment provider whose failure mode
+  (healthy, outage, slow, suspended, ratelimit) can be switched while it runs.

@@ -7,6 +7,10 @@
 *.local.yaml
 /wasitus.yaml
 
+# local Go workspace joining the tool and demo/ modules (see ADR-0006)
+go.work
+go.work.sum
+
 # caches
 .wasitus-cache/
 
