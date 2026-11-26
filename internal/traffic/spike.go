@@ -11,9 +11,10 @@ import (
 
 // Result is what Analyze found. Its numbers describe the whole window.
 type Result struct {
-	// Factor is WindowRequests divided by the expected requests (unrounded,
-	// and never less than 1, so a zero baseline gives a finite factor). It is
-	// 0 when the window has no baseline.
+	// Factor is WindowRequests divided by the expected requests, using the
+	// unrounded sum of the baselines with anything under 1 treated as 1, so
+	// a zero baseline still gives a finite factor. A quiet window gives a
+	// factor below 1. It is 0 unless every window bucket has a baseline.
 	Factor float64
 
 	// WindowRequests is the number of requests in the window.
