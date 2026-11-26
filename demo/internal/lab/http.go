@@ -63,7 +63,7 @@ func Fail(w http.ResponseWriter, r *http.Request, log *slog.Logger, status int, 
 	}
 	args := []any{"code", code, "status", status, "error", err}
 	for _, a := range attrs {
-		args = append(args, string(a.Key), a.Value.Emit())
+		args = append(args, string(a.Key), a.Value.AsInterface())
 	}
 	log.ErrorContext(r.Context(), "request failed", args...)
 	WriteError(w, status, code, err.Error())
