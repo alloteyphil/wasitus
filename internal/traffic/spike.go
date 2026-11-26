@@ -75,7 +75,10 @@ type slot struct {
 // Expected requests are the sum of the window buckets' baselines, and
 // Factor = window requests / expected. A spike needs every window bucket to
 // have a baseline: comparing part of a window could call a spike that the
-// rest of it would not support.
+// rest of it would not support. An expected count under 1 is treated as 1
+// for the whole window, so a few requests to an almost idle service (3 in an
+// hour against none) count as a spike; a caller that needs a minimum volume
+// should check WindowRequests.
 //
 // Missing buckets. A missing bucket means no data, not zero requests. A
 // collector must send zero-request buckets for quiet periods it did observe;
@@ -88,7 +91,11 @@ type slot struct {
 // the same start are added together, which also turns finer buckets (say one
 // minute) into cfg.BucketSize ones. Input buckets must not be wider than
 // cfg.BucketSize: a one-hour bucket would be counted in a single 5-minute
-// bucket.
+// bucket. A window that starts or ends partway through a slot (one-minute
+// buckets from 10:02) leaves its first or last slot holding only part of
+// that slot's time, yet that slot is compared with a whole slot's baseline,
+// which pulls Factor down. Pass windows that start and end on cfg.BucketSize
+// boundaries.
 func Analyze(window, history []Bucket, cfg Config) Result {
 	if err := cfg.Validate(); err != nil {
 		return Result{Reason: "invalid config: " + strings.ReplaceAll(err.Error(), "\n", "; ")}

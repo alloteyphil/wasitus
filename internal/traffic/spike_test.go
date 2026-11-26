@@ -130,6 +130,9 @@ func TestAnalyze(t *testing.T) {
 			reason: "requests 10.25x the 7-day median for this time of day (12300 vs 1200 expected)",
 		},
 		{
+			// Factor 3.0 sits exactly on the default spike factor and passes
+			// only because the check is >=. The lab's x3 traffic is noisy, so
+			// M3's scenario tuning must revisit SpikeFactor or the S4 load.
 			name: "S4 traffic x3 is exactly the spike factor", window: hour(flat(300, 90)), history: week,
 			spike: true, factor: 3, windowRequests: 3600, expected: 1200,
 			windowBuckets: 12, baselineBuckets: 12, peak: at10,
