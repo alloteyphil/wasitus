@@ -10,13 +10,51 @@ The lab is its own Go module, so the tool's dependencies stay small
 ```
 demo/
 ├── docker-compose.yml   # SigNoz + lab services                 (coming)
-├── services/                                                   (coming)
+├── internal/lab/        # shared: OpenTelemetry, HTTP, errors   (done)
+├── services/            # the lab's own services                (done)
 │   ├── storefront/
 │   ├── orders/
 │   └── wallet/
 ├── mockpay/             # fake external payment provider        (done)
 ├── trafficgen/                                                 (coming)
 └── scenarios/           # S1..S8 stage/reset scripts            (coming)
+```
+
+## Lab services
+
+```
+customer ─► storefront ─► orders-service ─► wallet-service ─► mockpay (external)
+  :8080        :8081           :8082            :8090
+```
+
+| Service | Does | Settings (besides `LAB_ADDR`, `APP_VERSION`) |
+|---|---|---|
+| `storefront` | `POST /checkout`; places the order | `ORDERS_URL`, `STOREFRONT_ORDERS_TIMEOUT` (8s) |
+| `orders-service` | `POST /orders`; pays through the wallet | `WALLET_URL`, `ORDERS_WALLET_TIMEOUT` (5s), `ORDERS_BUG_EVERY` (0) |
+| `wallet-service` | `POST /payments`; charges mockpay | `MOCKPAY_URL`, `WALLET_PROVIDER_TIMEOUT` (3s) |
+
+Each service sends traces and logs to SigNoz when `OTEL_EXPORTER_OTLP_ENDPOINT`
+is set, and always logs JSON to stdout. A checkout is one trace across all
+three services. `APP_VERSION` becomes `service.version`, so a staged deploy is
+visible in the traces.
+
+The two kinds of failure look different, which is what wasitus will judge:
+
+| Staged | Customer sees | Our telemetry shows |
+|---|---|---|
+| mockpay `suspended` (external) | 502 `CheckoutFailed` | wallet-service: `payment.provider.error_code=AccountSuspended`, mockpay answered 402 |
+| orders `ORDERS_BUG_EVERY=2` (our side, S1) | 502 on every 2nd order | orders-service: a `runtime.boundsError` exception ("index out of range") on the new version |
+
+Run the chain without Docker (one terminal each):
+
+```
+go run ./mockpay
+go run ./services/wallet
+go run ./services/orders
+go run ./services/storefront
+
+curl -X POST localhost:8080/checkout \
+  -d '{"customer_id": "cus_42", "amount": 2500, "currency": "GHS"}'
 ```
 
 ## mockpay
@@ -41,16 +79,16 @@ services see when they call it.
 Run it and switch modes:
 
 ```
-go run ./mockpay                       # listens on :8080, starts healthy
+go run ./mockpay                       # listens on :8090, starts healthy
 
-curl -X POST localhost:8080/v1/charges \
+curl -X POST localhost:8090/v1/charges \
   -d '{"amount": 2500, "currency": "GHS", "reference": "order-1001"}'
 
-curl -X PUT localhost:8080/admin/mode -d '{"mode": "suspended"}'
-curl localhost:8080/admin/mode
+curl -X PUT localhost:8090/admin/mode -d '{"mode": "suspended"}'
+curl localhost:8090/admin/mode
 ```
 
-Settings: `MOCKPAY_ADDR` (default `:8080`), `MOCKPAY_MODE` (default `healthy`),
+Settings: `MOCKPAY_ADDR` (default `:8090`), `MOCKPAY_MODE` (default `healthy`),
 `MOCKPAY_SLOW_DELAY` (default `6s`), `MOCKPAY_RATE_LIMIT` (charges per minute,
 default `60`). Switching mode resets the rate-limit window and the outage
 counter, so every staged scenario starts from the same state. `/healthz`
