@@ -60,16 +60,20 @@ summary, Slack output, MCP server, web UI.
 
 Time is in weekends (roughly 8–10 focused hours each). Estimates, not promises.
 
-### M0: Foundations (this weekend: 28–29 Nov)
-- [ ] Create GitHub repo `alloteyphil/wasitus` (public), push the skeleton
-- [ ] CI: build, `go vet`, `golangci-lint`, `go test -race`
-- [ ] `Event` model and `Window` type with unit tests
-- [ ] Config loading (YAML + secrets from environment variables) with validation
-- [ ] CLI skeleton: `wasitus version`, `wasitus timeline --from --to --config`
-- [ ] Conventional commits, CHANGELOG.md, issue labels, GitHub milestones M0–M5
+### M0: Foundations (started 26 Nov)
+- [x] Create GitHub repo `alloteyphil/wasitus` (private until there is something
+      to show; switch to public by M2), push the skeleton
+- [x] CI: formatting, `go mod tidy`, `go vet`, `golangci-lint`, `go test -race`
+- [x] `Event` model and `Window` type with unit tests
+- [x] Config loading (YAML + secrets from environment variables) with validation
+- [x] CLI skeleton: `wasitus version`, `wasitus timeline --from --to --config`
+- [x] Changes-file collector (moved up from M2: it is local, needs no network, and
+      makes the first slice real instead of fake)
+- [x] Conventional commits, CHANGELOG.md, GitHub milestones M0–M5
+- [ ] CI green on the first pull request
 
-**Done when:** CI is green and `wasitus timeline` runs end-to-end with a fake
-in-memory collector.
+**Done when:** CI is green and `wasitus timeline` runs end-to-end against the
+example changes file.
 
 ### M1: The demo lab (weekend 2)
 - [ ] `demo/` Docker Compose: SigNoz + 3 small Go services (storefront, orders,
@@ -86,7 +90,7 @@ local SigNoz.
 ### M2: The timeline (weekend 3)
 - [ ] Spike: confirm which SigNoz API endpoints give alert history and query
       traces/logs (record findings in an ADR)
-- [ ] Collectors: SigNoz alerts, GitHub (PRs, deployments, releases), changes file
+- [ ] Collectors: SigNoz alerts, GitHub (PRs, deployments, releases)
 - [ ] Record/replay test harness: real API responses saved to `testdata/`, replayed
       through `httptest` servers in CI
 - [ ] Merge, sort, de-duplicate; terminal table output

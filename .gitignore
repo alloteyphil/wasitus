@@ -5,7 +5,7 @@
 # local config and secrets
 .env
 *.local.yaml
-wasitus.yaml
+/wasitus.yaml
 
 # caches
 .wasitus-cache/
