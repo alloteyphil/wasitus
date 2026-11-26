@@ -70,7 +70,10 @@ Time is in weekends (roughly 8–10 focused hours each). Estimates, not promises
 - [x] Changes-file collector (moved up from M2: it is local, needs no network, and
       makes the first slice real instead of fake)
 - [x] Conventional commits, CHANGELOG.md, GitHub milestones M0–M5
-- [ ] CI green on the first pull request
+- [x] CI green on the first pull request
+- [ ] CI/CD (added 26 Nov, to learn GitHub Actions; see docs/CI_CD.md): tests on
+      Linux, macOS and Windows, workflow lint, release dry run on every PR,
+      release workflow on `v*` tags (moved up from M5), Dependabot
 
 **Done when:** CI is green and `wasitus timeline` runs end-to-end against the
 example changes file.
@@ -118,7 +121,7 @@ timeline, and the collector tests run offline.
 **Done when:** 8/8 scenarios produce the expected verdict in CI.
 
 ### M5: Ship v0.1 (weekend 7)
-- [ ] Releases with GoReleaser (macOS, Linux, Windows) + Homebrew tap
+- [ ] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
 - [ ] README with demo GIF and 10-minute quickstart against the lab
 - [ ] Design write-up / blog post: "Was it us? Telling our failures from someone
       else's"

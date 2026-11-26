@@ -17,4 +17,9 @@ All notable changes to this project are documented here. The format follows
 - Collector runner: runs sources concurrently and survives a failing or
   panicking source (exit code 3 with warnings).
 - Changes-file collector for manual notes.
-- CI: formatting, `go mod tidy`, vet, race-enabled tests, golangci-lint.
+- CI: formatting, `go mod tidy`, vet, golangci-lint, and tests on Linux, macOS
+  and Windows (race detector on Linux and macOS), plus a coverage summary,
+  workflow lint and a release dry run on every pull request.
+- Release workflow: pushing a `v*` tag publishes a GitHub Release with binaries
+  for macOS, Linux and Windows (amd64 and arm64) and checksums.
+- Dependabot updates for GitHub Actions and Go modules.

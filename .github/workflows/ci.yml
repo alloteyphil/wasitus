@@ -1,3 +1,9 @@
+# CI: checks every pull request and every push to main.
+#
+# A workflow is a YAML file in .github/workflows/. It says WHEN to run (`on`)
+# and WHAT to run (`jobs`). Jobs run in parallel, each on a fresh virtual
+# machine (a "runner"). The steps inside one job run in order on that machine.
+# A walkthrough of everything used here: docs/CI_CD.md
 name: ci
 
 on:
@@ -5,28 +11,74 @@ on:
     branches: [main]
   pull_request:
 
+# Every run gets a GITHUB_TOKEN. Here it may only read the repo; a job that
+# needs more asks for it explicitly (see release.yml).
 permissions:
   contents: read
 
+# A new push to the same branch cancels the run that is still in progress.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  checks:
+    name: format, tidy, vet, build
     runs-on: ubuntu-latest
     steps:
+      # `uses` runs an Action: a reusable step someone published. `@v7` pins
+      # the major version.
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7 # also caches downloaded modules and builds
         with:
           go-version-file: go.mod
+      # `run` runs shell commands. A non-zero exit code fails the step.
       - name: Check formatting
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - name: Check go.mod is tidy
         run: go mod tidy -diff
       - run: go vet ./...
-      - run: go test -race -count=1 ./...
       - run: go build -o /dev/null ./cmd/wasitus
+
+  test:
+    # A matrix runs the same job once per value: here three machines at once.
+    strategy:
+      fail-fast: false # let every OS finish, so one failure can't hide another
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # `if` decides whether a step runs. The race detector needs a C compiler
+      # on Windows, so Windows runs the tests without it.
+      - name: Test (race detector)
+        if: runner.os != 'Windows'
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Test
+        if: runner.os == 'Windows'
+        run: go test -count=1 ./...
+      # Text appended to $GITHUB_STEP_SUMMARY appears on the run's summary page.
+      - name: Coverage summary
+        if: runner.os == 'Linux'
+        run: |
+          {
+            echo '### Test coverage'
+            echo '```'
+            go tool cover -func=coverage.out | tail -1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # An artifact is a file kept after the runner is thrown away. Download it
+      # from the run's summary page.
+      - name: Upload coverage report
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 7
 
   lint:
     runs-on: ubuntu-latest
@@ -38,3 +90,43 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  workflows:
+    name: lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # Workflows are code too: actionlint catches typos, bad expressions and
+      # shell mistakes in these YAML files.
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+  release-dry-run:
+    name: release dry run
+    # `needs` makes this job wait until these jobs have passed.
+    needs: [checks, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history and tags; GoReleaser reads them
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # Builds every release binary exactly like release.yml, but publishes
+      # nothing (--snapshot). A broken release config shows up here, on the
+      # pull request, instead of on release day.
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: binaries
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          retention-days: 7
