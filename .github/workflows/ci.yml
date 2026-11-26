@@ -10,6 +10,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Also weekly, so a newly published vulnerability or a broken dependency
+  # shows up even in a week with no pushes.
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
 
 # Every run gets a GITHUB_TOKEN. Here it may only read the repo; a job that
 # needs more asks for it explicitly (see release.yml).
@@ -53,13 +57,14 @@ jobs:
         with:
           go-version-file: go.mod
       # `if` decides whether a step runs. The race detector needs a C compiler
-      # on Windows, so Windows runs the tests without it.
+      # on Windows, so Windows runs the tests without it. -shuffle=on runs
+      # tests in a random order, which exposes tests that depend on each other.
       - name: Test (race detector)
         if: runner.os != 'Windows'
-        run: go test -race -count=1 -coverprofile=coverage.out ./...
+        run: go test -race -shuffle=on -count=1 -coverprofile=coverage.out ./...
       - name: Test
         if: runner.os == 'Windows'
-        run: go test -count=1 ./...
+        run: go test -shuffle=on -count=1 ./...
       # Text appended to $GITHUB_STEP_SUMMARY appears on the run's summary page.
       - name: Coverage summary
         if: runner.os == 'Linux'
@@ -70,6 +75,10 @@ jobs:
             go tool cover -func=coverage.out | tail -1
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # The same script `make check` uses, so local and CI agree.
+      - name: Coverage floor (85%)
+        if: runner.os == 'Linux'
+        run: scripts/coverage-floor.sh coverage.out 85
       # An artifact is a file kept after the runner is thrown away. Download it
       # from the run's summary page.
       - name: Upload coverage report
@@ -107,7 +116,7 @@ jobs:
           go-version-file: demo/go.mod
       - run: go mod tidy -diff
       - run: go vet ./...
-      - run: go test -race -count=1 -timeout 2m ./...
+      - run: go test -race -shuffle=on -count=1 -timeout 2m ./...
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
@@ -152,3 +161,41 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
           retention-days: 7
+
+  vulncheck:
+    name: known vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      # govulncheck reports only vulnerabilities in code the program actually
+      # calls, in our dependencies or in the Go standard library.
+      - name: govulncheck (tool)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: govulncheck (demo lab)
+        working-directory: demo
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  # One check that sums up all the others. Branch protection requires only
+  # this one, so adding or renaming a job can never weaken the rule.
+  ci-ok:
+    name: ci ok
+    # always(): without it, this job is SKIPPED when a job it needs fails,
+    # and GitHub treats a skipped required check as passing.
+    if: always()
+    needs: [checks, test, lint, demo, workflows, release-dry-run, vulncheck]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error::A required job did not succeed ($r)"
+              exit 1
+            fi
+          done
