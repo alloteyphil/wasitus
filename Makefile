@@ -44,3 +44,40 @@ lint:
 	else \
 		echo "golangci-lint is not installed (brew install golangci-lint); CI will run it."; \
 	fi
+
+# ---- Demo lab (needs Docker; see demo/README.md) ----------------------------
+
+LAB := docker compose -f demo/compose.yaml
+
+.PHONY: lab-up lab-down lab-reset lab-ps lab-logs lab-smoke
+
+# Build and start SigNoz and the lab, wait until every service is healthy,
+# then finish SigNoz's first-run setup (it ingests nothing until then).
+lab-up: demo/.env
+	$(LAB) up -d --build --wait --wait-timeout 300
+	demo/signoz/setup.sh
+	@echo "Lab is up: storefront http://localhost:8000  mockpay http://localhost:8090  SigNoz http://localhost:8080"
+
+lab-down:
+	$(LAB) down
+
+# Stop the lab and delete its data (SigNoz databases included).
+lab-reset:
+	$(LAB) down --volumes
+
+lab-ps:
+	$(LAB) ps
+
+lab-logs:
+	$(LAB) logs -f --tail=50
+
+# Prove the running lab works end to end: checkouts, a staged failure, and the
+# traces of both in SigNoz. CI runs this too (.github/workflows/lab.yml).
+lab-smoke:
+	demo/scripts/smoke.sh
+
+# A random local password for SigNoz's Postgres, created once. demo/.env is
+# ignored by git, so no password is ever committed.
+demo/.env:
+	@umask 077 && printf 'LAB_POSTGRES_PASSWORD=%s\n' "$$(openssl rand -hex 16)" > $@
+	@echo "Created $@ with a random LAB_POSTGRES_PASSWORD"
