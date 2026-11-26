@@ -3,6 +3,9 @@
 /dist/
 coverage.out
 
+# git worktrees that parallel AI agents work in
+/.claude/worktrees/
+
 # local config and secrets
 .env
 *.local.yaml
