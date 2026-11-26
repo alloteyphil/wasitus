@@ -30,6 +30,17 @@ func hourly(t time.Time) (int, int) {
 	return r, r / 50
 }
 
+// firstBucket gives the window's first bucket (at10) first requests and every
+// other bucket rest, with no errors.
+func firstBucket(first, rest int) counts {
+	return func(t time.Time) (int, int) {
+		if t.Equal(at10) {
+			return first, 0
+		}
+		return rest, 0
+	}
+}
+
 // times multiplies c's load by k.
 func times(c counts, k int) counts {
 	return func(t time.Time) (int, int) {
@@ -135,6 +146,20 @@ func TestAnalyze(t *testing.T) {
 			factor: 2.99, windowRequests: 3588, expected: 1200,
 			windowBuckets: 12, baselineBuckets: 12, peak: at10,
 			reason: "requests 2.99x the 7-day median for this time of day (3588 vs 1200 expected), below the 3x spike factor",
+		},
+		{
+			// 3595 / 1200 = 2.9958, which two decimals would print as 3.
+			name: "just below the spike factor keeps the decimals it needs", window: hour(firstBucket(295, 300)), history: week,
+			factor: 3595.0 / 1200, windowRequests: 3595, expected: 1200,
+			windowBuckets: 12, baselineBuckets: 12, peak: at10.Add(bucket),
+			reason: "requests 2.996x the 7-day median for this time of day (3595 vs 1200 expected), below the 3x spike factor",
+		},
+		{
+			name: "spike factor printed as configured", window: hour(flat(299, 2)), history: week,
+			cfg:    func(c *Config) { c.SpikeFactor = 2.995 },
+			factor: 2.99, windowRequests: 3588, expected: 1200,
+			windowBuckets: 12, baselineBuckets: 12, peak: at10,
+			reason: "requests 2.99x the 7-day median for this time of day (3588 vs 1200 expected), below the 2.995x spike factor",
 		},
 		{
 			name: "spike factor from config", window: hour(flat(300, 2)), history: week,
@@ -463,6 +488,30 @@ func TestMedian(t *testing.T) {
 	for _, tt := range tests {
 		if got := median(slices.Clone(tt.in)); got != tt.want {
 			t.Errorf("median(%v) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestFormatFactor(t *testing.T) {
+	tests := []struct {
+		f, limit float64
+		want     string
+	}{
+		{10.25, 3, "10.25"},
+		{10.2, 3, "10.2"},
+		{3, 3, "3"},
+		{3.004, 3, "3"}, // at or above the limit, two decimals are enough
+		{2.99, 3, "2.99"},
+		{3595.0 / 1200, 3, "2.996"},
+		{2.99999, 3, "2.99999"},
+		{2.9905, 2.991, "2.99"},
+		{1.0 / 3, 3, "0.33"},
+		{0, 3, "0"},
+		{math.Nextafter(3, 0), 3, "2.9999999999999996"}, // too close for 15 decimals
+	}
+	for _, tt := range tests {
+		if got := formatFactor(tt.f, tt.limit); got != tt.want {
+			t.Errorf("formatFactor(%v, %v) = %q, want %q", tt.f, tt.limit, got, tt.want)
 		}
 	}
 }
