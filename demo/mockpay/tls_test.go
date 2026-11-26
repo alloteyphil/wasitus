@@ -211,32 +211,33 @@ func TestBadCertClosesOpenConnections(t *testing.T) {
 				ForceAttemptHTTP2: tt.http2,
 			}}
 			t.Cleanup(client.CloseIdleConnections)
-			charge := func() (*http.Response, error) {
+			// charge returns the answer's status and HTTP major version.
+			charge := func() (status, proto int, err error) {
 				resp, err := client.Post("https://"+addr+"/v1/charges", "application/json", strings.NewReader(validCharge))
 				if err != nil {
-					return nil, err
+					return 0, 0, err
 				}
 				defer resp.Body.Close()
 				_, err = io.Copy(io.Discard, resp.Body)
-				return resp, err
+				return resp.StatusCode, resp.ProtoMajor, err
 			}
 
-			resp, err := charge()
-			if err != nil || resp.StatusCode != http.StatusCreated {
-				t.Fatalf("healthy charge: %v, %v", resp, err)
+			status, proto, err := charge()
+			if err != nil || status != http.StatusCreated {
+				t.Fatalf("healthy charge: %d, %v", status, err)
 			}
-			if resp.ProtoMajor != tt.wantProto {
-				t.Fatalf("protocol HTTP/%d, want %s", resp.ProtoMajor, tt.name)
+			if proto != tt.wantProto {
+				t.Fatalf("protocol HTTP/%d, want %s", proto, tt.name)
 			}
 
 			setMode(t, plain, ModeBadCert)
 			// The connection is already open, so this charge goes through,
 			// and the answer tells the client to close the connection.
-			if resp, err := charge(); err != nil || resp.StatusCode != http.StatusCreated {
-				t.Fatalf("charge on the open connection: %v, %v", resp, err)
+			if status, _, err := charge(); err != nil || status != http.StatusCreated {
+				t.Fatalf("charge on the open connection: %d, %v", status, err)
 			}
 			for i := 0; ; i++ {
-				_, err := charge()
+				_, _, err := charge()
 				if isExpired(err) {
 					break
 				}
