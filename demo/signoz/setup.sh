@@ -15,14 +15,17 @@ env_file=.env
 signoz=${SIGNOZ_URL:-http://localhost:8080}
 otlp=${OTLP_HTTP_URL:-http://localhost:4318}
 
-umask 077 # demo/.env is readable by you only
+umask 077
 touch "$env_file"
+chmod 600 "$env_file" # readable by you only, even if it already existed
 get() { sed -n "s/^$1=//p" "$env_file" | tail -n 1; }
 
 # Lab-only admin credentials, created once and never committed. The random
 # part comes from openssl; the fixed part guarantees the upper case, lower
 # case, digit and symbol that SigNoz's password rules ask for.
+just_generated=false
 if [[ -z "$(get LAB_SIGNOZ_PASSWORD)" ]]; then
+  just_generated=true
   generated="Lab-Aa1-$(openssl rand -hex 12)"
   # Start on a new line even if the file does not end with one.
   if [[ -s "$env_file" && -n "$(tail -c 1 "$env_file")" ]]; then echo >>"$env_file"; fi
@@ -37,9 +40,14 @@ password=$(get LAB_SIGNOZ_PASSWORD)
 setup_done=$(curl -fsS "$signoz/api/v1/version" | jq -r '.setupCompleted')
 if [[ "$setup_done" != "true" ]]; then
   echo "SigNoz: creating the lab admin account ($email)"
-  jq -n --arg e "$email" --arg p "$password" \
-    '{name: "Lab Admin", email: $e, password: $p, orgDisplayName: "wasitus lab", orgName: "wasitus-lab"}' |
+  # The password reaches jq through the environment, not the command line,
+  # so it never shows up in `ps`.
+  LAB_EMAIL="$email" LAB_PASSWORD="$password" jq -n \
+    '{name: "Lab Admin", email: env.LAB_EMAIL, password: env.LAB_PASSWORD, orgDisplayName: "wasitus lab", orgName: "wasitus-lab"}' |
     curl -fsS -X POST "$signoz/api/v1/register" -H 'Content-Type: application/json' --data @- >/dev/null
+elif [[ "$just_generated" == true ]]; then
+  echo "Warning: SigNoz was already set up, but demo/.env had no login, so the one just" >&2
+  echo "written there does not work. Run 'make lab-reset && make lab-up' for a fresh lab." >&2
 fi
 
 # After signup the server sends the ingester its real pipeline config and the
