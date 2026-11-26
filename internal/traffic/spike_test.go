@@ -326,6 +326,37 @@ func TestAnalyze(t *testing.T) {
 			history: []Bucket{{Start: at10.Add(-day), Requests: 5, Errors: -1}},
 			reason:  "history: bucket at 2026-12-14T10:00:00Z has a negative count (requests 5, errors -1)",
 		},
+		{
+			name:    "zero start in the window",
+			window:  append(hour(flat(1000, 20)), Bucket{Requests: 5}),
+			history: week,
+			reason:  "window: bucket at 0001-01-01T00:00:00Z starts outside the supported range (after 1970-01-01, before 2200-01-01)",
+		},
+		{
+			name:    "Unix time 0 in the history",
+			window:  hour(flat(1000, 20)),
+			history: append(slices.Clone(week), Bucket{Start: time.Unix(0, 0), Requests: 5}),
+			reason:  "history: bucket at 1970-01-01T00:00:00Z starts outside the supported range (after 1970-01-01, before 2200-01-01)",
+		},
+		{
+			name:    "start in 2200",
+			window:  []Bucket{{Start: time.Date(2200, 1, 1, 0, 0, 0, 0, time.UTC), Requests: 5}},
+			history: week,
+			reason:  "window: bucket at 2200-01-01T00:00:00Z starts outside the supported range (after 1970-01-01, before 2200-01-01)",
+		},
+		{
+			name:           "just after the Unix epoch",
+			window:         []Bucket{{Start: time.Unix(0, 1), Requests: 5}},
+			windowRequests: 5, windowBuckets: 1, peak: time.Unix(0, 0),
+			reason: "no history before the window; a baseline needs data at this time of day on at least 3 of the previous 7 days",
+		},
+		{
+			name:           "just before 2200",
+			window:         []Bucket{{Start: time.Date(2199, 12, 31, 23, 59, 0, 0, time.UTC), Requests: 5}},
+			history:        week,
+			windowRequests: 5, windowBuckets: 1, peak: time.Date(2199, 12, 31, 23, 55, 0, 0, time.UTC),
+			reason: "too little history: no window bucket has data at this time of day on at least 3 of the previous 7 days",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
