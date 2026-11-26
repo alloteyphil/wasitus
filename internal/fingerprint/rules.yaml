@@ -1,2 +1,138 @@
-# Built-in fingerprint rules: see the package comment (doc.go) for the format.
-[]
+# Built-in fingerprint rules. The package comment (doc.go) describes the format.
+#
+# The first rule that matches a sample decides its class, so order matters:
+#
+# 1. code: panics raised by our own process. A runtime panic is our bug,
+#    whatever else its message mentions.
+# 2. account, limit, expiry: specific root causes. They match words anywhere
+#    in the message, because each service that passes an error on wraps it
+#    ("could not place the order: HTTP 502 PaymentFailed: ... HTTP 402
+#    AccountSuspended: ..."), so the root cause reaches the top of the chain.
+# 3. dependency: generic third-party failures (unavailable, timeouts,
+#    unreachable). They come last because their words are the least specific,
+#    and the timeout and connection rules only hold for calls to a third party.
+#
+# No rule matches the wrapper text our own services add ("HTTP 502",
+# "could not place the order"), so a failure that starts in our code stays
+# code through the fallback. Users override any of this with their own rules.
+
+# --- code ---------------------------------------------------------------------
+
+- id: go-runtime-panic
+  class: code
+  match:
+    any:
+      # runtime.boundsError (index out of range), runtime.errorString (nil
+      # pointer), *runtime.TypeAssertionError, and so on.
+      - exception_type_contains: "runtime."
+
+# --- account ------------------------------------------------------------------
+
+- id: account-suspended
+  class: account
+  match:
+    any:
+      - message_contains: "AccountSuspended"
+      - message_contains: "account suspended"
+      - message_contains: "account is suspended"
+      - message_contains: "SubscriptionRequired"
+      - message_contains: "OptInRequired"
+      - message_contains: "PaymentRequired"
+      - message_contains: "payment required"
+      - http_status: 402
+
+- id: account-access-denied
+  class: account
+  match:
+    any:
+      - message_contains: "AccessDenied"   # also AccessDeniedException
+
+# --- limit --------------------------------------------------------------------
+
+- id: limit-rate-limited
+  class: limit
+  match:
+    any:
+      - http_status: 429
+      - message_contains: "RateLimited"
+      - message_contains: "rate limit"     # rate limit exceeded, rate limited
+      - message_contains: "Rate exceeded"
+      - message_contains: "TooManyRequests"
+      - message_contains: "too many requests"
+      - message_contains: "Throttling"     # ThrottlingException
+      - message_contains: "Throttled"
+
+- id: limit-quota-exceeded
+  class: limit
+  match:
+    any:
+      - message_contains: "quota exceeded"
+      - message_contains: "QuotaExceeded"
+      - message_contains: "LimitExceeded"  # LimitExceededException, RequestLimitExceeded
+
+# --- expiry -------------------------------------------------------------------
+
+- id: expiry-certificate
+  class: expiry
+  match:
+    any:
+      # Go: "tls: failed to verify certificate: x509: certificate has expired
+      # or is not yet valid". Other x509 failures (unknown authority, wrong
+      # host name) are certificate problems too.
+      - message_contains: "x509:"
+      - message_contains: "tls: failed to verify certificate"
+      - message_contains: "certificate has expired"
+      - message_contains: "certificate expired"
+      - message_contains: "CERT_HAS_EXPIRED"
+      - message_contains: "certificate verify failed"
+
+- id: expiry-token-or-key
+  class: expiry
+  match:
+    any:
+      - message_contains: "ExpiredToken"   # also ExpiredTokenException
+      - message_contains: "TokenExpired"
+      - message_contains: "token expired"
+      - message_contains: "token has expired"
+      - message_contains: "token is expired"
+      - message_contains: "key expired"
+      - message_contains: "key has expired"
+
+# --- dependency ---------------------------------------------------------------
+
+- id: dependency-unavailable
+  class: dependency
+  match:
+    any:
+      - message_contains: "ServiceUnavailable"   # "HTTP 503 ServiceUnavailable"
+      - {outbound: true, third_party: true, http_status: 502}
+      - {outbound: true, third_party: true, http_status: 503}
+      - {outbound: true, third_party: true, http_status: 504}
+
+- id: dependency-timeout
+  class: dependency
+  match:
+    all:
+      - third_party: true
+    any:
+      - message_contains: "context deadline exceeded"
+      - message_contains: "Client.Timeout exceeded"
+      - message_contains: "did not answer in time"
+      - message_contains: "i/o timeout"
+      - message_contains: "timed out"
+      - message_contains: "TLS handshake timeout"
+      - message_contains: "timeout awaiting response headers"
+
+- id: dependency-unreachable
+  class: dependency
+  match:
+    all:
+      - third_party: true
+    any:
+      - message_contains: "connection refused"
+      - message_contains: "no such host"
+      - message_contains: "connection reset"
+      - message_contains: "no route to host"
+      - message_contains: "network is unreachable"
+      - message_contains: "ECONNREFUSED"
+      - message_contains: "ENOTFOUND"
