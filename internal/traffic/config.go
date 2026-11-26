@@ -9,7 +9,9 @@ import (
 
 // Bucket is the number of requests, and of those the errors, in one
 // fixed-size slice of time that starts at Start. Analyze explains how a Start
-// that is not on a bucket boundary is handled.
+// that is not on a bucket boundary is handled. Start must be after the Unix
+// epoch and before the year 2200; Analyze refuses a zero Start as a missing
+// timestamp.
 type Bucket struct {
 	Start    time.Time
 	Requests int

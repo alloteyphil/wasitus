@@ -59,8 +59,8 @@ type slot struct {
 
 // Analyze decides whether the requests in window were far above normal for
 // that time of day, judged against history. It never fails: an invalid cfg, a
-// negative count or too little history gives IsSpike false and a Reason that
-// says why.
+// negative count, a bucket Start that is zero or out of range (see Bucket) or
+// too little history gives IsSpike false and a Reason that says why.
 //
 // Baseline. Each window bucket's baseline is the median Requests of the
 // history buckets at the same time of day, give or take one bucket, on each
@@ -220,16 +220,30 @@ func tooLittleHistory(b baseline, windowBuckets int, cfg Config) string {
 	}
 }
 
+// Bucket starts must fall strictly between minStart and maxStart. A zero
+// Start (year 1) or a Unix time of 0 almost always means a missing timestamp.
+// The bounds also keep slot keys, in Unix nanoseconds, far enough inside an
+// int64 that stepping back maxBaselineDays days cannot overflow.
+var (
+	minStart = time.Unix(0, 0).UTC()
+	maxStart = time.Date(2200, 1, 1, 0, 0, 0, 0, time.UTC)
+)
+
 // align moves every bucket to the start of its size-wide slot in UTC and adds
 // up buckets that share a slot. Slots are keyed by start in Unix nanoseconds.
 func align(buckets []Bucket, size time.Duration) (map[int64]*slot, error) {
 	out := make(map[int64]*slot, len(buckets))
 	for _, b := range buckets {
+		start := b.Start.UTC()
 		if b.Requests < 0 || b.Errors < 0 {
 			return nil, fmt.Errorf("bucket at %s has a negative count (requests %d, errors %d)",
-				b.Start.UTC().Format(time.RFC3339), b.Requests, b.Errors)
+				start.Format(time.RFC3339), b.Requests, b.Errors)
 		}
-		start := b.Start.UTC().Truncate(size)
+		if !start.After(minStart) || !start.Before(maxStart) {
+			return nil, fmt.Errorf("bucket at %s starts outside the supported range (after %s, before %s)",
+				start.Format(time.RFC3339), minStart.Format(time.DateOnly), maxStart.Format(time.DateOnly))
+		}
+		start = start.Truncate(size)
 		key := start.UnixNano()
 		s := out[key]
 		if s == nil {
