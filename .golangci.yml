@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  # "standard" set (errcheck, govet, ineffassign, staticcheck, unused) plus:
+  enable:
+    - bodyclose      # HTTP collectors arrive in M2
+    - errorlint      # wrap and compare errors correctly
+    - gocritic
+    - misspell
+    - nolintlint
+    - unconvert
+  exclusions:
+    presets:
+      - std-error-handling # unchecked fmt.Fprint* to stdout/stderr and Close are fine here
