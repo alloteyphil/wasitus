@@ -7,9 +7,34 @@ The lab is its own Go module, so the tool's dependencies stay small
 (../docs/adr/0006-demo-separate-module.md). Run its tests from this folder:
 `go test -race ./...`.
 
+## Run the lab with Docker
+
+Needs Docker with about 6 GB of memory for containers. From the repository root:
+
+```
+make lab-up      # build and start SigNoz + the lab, wait until healthy
+make lab-ps      # what is running
+make lab-logs    # follow the logs
+make lab-down    # stop (data kept)
+make lab-reset   # stop and delete all lab data
+```
+
+| What | Where |
+|---|---|
+| Checkout (the customers' way in) | `curl -X POST localhost:8000/checkout -d '{"customer_id":"cus_42","amount":2500,"currency":"GHS"}'` |
+| Switch mockpay's failure mode | `curl -X PUT localhost:8090/admin/mode -d '{"mode":"suspended"}'` |
+| SigNoz (traces, logs) | http://localhost:8080 |
+| A staged bad deploy (S1) | `ORDERS_VERSION=1.4.0 ORDERS_BUG_EVERY=5 docker compose -f demo/compose.yaml up -d orders-service` |
+
+`make lab-up` first creates `demo/.env` with a random password for SigNoz's
+database; git ignores that file. SigNoz's own files and where they come from:
+[signoz/README.md](signoz/README.md).
+
 ```
 demo/
-├── docker-compose.yml   # SigNoz + lab services                 (coming)
+├── compose.yaml         # the lab: SigNoz + lab services        (done)
+├── Dockerfile           # one image recipe for every program    (done)
+├── signoz/              # SigNoz, pinned (from Foundry)         (done)
 ├── internal/lab/        # shared: OpenTelemetry, HTTP, errors   (done)
 ├── services/            # the lab's own services                (done)
 │   ├── storefront/
