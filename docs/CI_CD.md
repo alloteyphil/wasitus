@@ -37,10 +37,39 @@ flowchart LR
 
 | File | Runs when | Does |
 |---|---|---|
-| `.github/workflows/ci.yml` | every pull request, every push to `main` | checks, tests on 3 OSes, lint, release dry run |
+| `.github/workflows/ci.yml` | every pull request, every push to `main`, Mondays | checks, tests on 3 OSes, coverage floor, lint, lab checks, vulnerability scan, release dry run, then `ci ok` |
 | `.github/workflows/release.yml` | a tag starting with `v` is pushed | tests, then publishes a GitHub Release with binaries |
 | `.goreleaser.yaml` | used by both workflows | how to build, package and describe a release |
 | `.github/dependabot.yml` | weekly | opens PRs that update Actions and Go modules |
+| `Makefile` | `make check`, before every push | the same checks as CI, on your machine |
+| `scripts/pr-green.sh` | before every merge | says whether a PR is safe to merge, strictly |
+
+## The rules that protect `main`
+
+Code reaches `main` only through a pull request, and only when all of these hold:
+
+| Rule | Enforced by |
+|---|---|
+| Formatted, tidy, vetted, builds | `checks` job |
+| Tests pass on Linux, macOS and Windows, in random order, with the race detector | `test` job |
+| Tool coverage at least 85% | `test` job, `scripts/coverage-floor.sh` |
+| golangci-lint clean, for the tool and the lab | `lint`, `demo` jobs |
+| No known vulnerability in code we call | `vulncheck` job (`govulncheck`) |
+| Workflows are valid, the release still builds | `workflows`, `release-dry-run` jobs |
+| All of the above passed | `ci ok`, the one check GitHub requires |
+| No leaked secrets | GitGuardian, also required |
+| The branch includes the latest `main` | branch protection ("up to date") |
+| Someone other than the author reviewed it | merge rule in CLAUDE.md |
+
+Why a single `ci ok` job: GitHub can require specific checks before merging, but
+a required check that is *skipped* counts as passed. `ci ok` runs with
+`if: always()` and fails unless every job it depends on succeeded, so one
+required check covers everything, and adding a job never weakens the rule.
+
+Why `scripts/pr-green.sh`: on PR #4 a merge script read "no output" as "no
+failures" and merged a PR with a failing lint job. The script now demands a
+positive answer: check results exist, the required ones are present, every one
+passed, and GitHub reports the PR as mergeable and up to date.
 
 ## Concepts, and where each one is used
 
