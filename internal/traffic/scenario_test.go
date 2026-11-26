@@ -25,6 +25,8 @@ func TestScenarios(t *testing.T) {
 			wantStable:   true,
 		},
 		{
+			// x3 is exactly the default spike factor (3.0 >= 3.0), so any
+			// noise in the lab's load can flip this; tune it in M3.
 			name:         "S4 rate limited: x3 and mockpay answers 429",
 			window:       series(at10, 12, bucket, times(hourly, 3)),
 			windowErrors: map[string]int{"dependency": 12, "code": 3, "limit": 400},
