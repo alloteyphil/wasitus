@@ -8,6 +8,10 @@ set -euo pipefail
 
 file="${1:?usage: scripts/coverage-floor.sh COVERAGE_FILE MIN_PERCENT}"
 min="${2:?usage: scripts/coverage-floor.sh COVERAGE_FILE MIN_PERCENT}"
+if ! [[ "$min" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "::error::MIN_PERCENT must be a number, got '$min'"
+  exit 1
+fi
 
 total=$(go tool cover -func="$file" | awk '/^total:/ { sub("%", "", $NF); print $NF }')
 if [[ -z "$total" ]]; then
