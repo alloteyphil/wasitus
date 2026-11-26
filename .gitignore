@@ -1,6 +1,7 @@
 # build output
 /wasitus
 /dist/
+coverage.out
 
 # local config and secrets
 .env
