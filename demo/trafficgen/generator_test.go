@@ -61,6 +61,7 @@ type logLine struct {
 	Multiplier      float64          `json:"multiplier"`
 	TargetRPS       float64          `json:"target_rps"`
 	LastError       string           `json:"last_error"`
+	AdminAddr       string           `json:"admin_addr"`
 }
 
 // lines returns the logged lines with the given message.
