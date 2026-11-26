@@ -15,7 +15,7 @@ updates:
       include: scope # "ci(deps): ..."
 
   - package-ecosystem: gomod
-    directory: /
+    directories: [/, /demo] # the tool and the demo lab are separate modules
     schedule:
       interval: weekly
     groups:
