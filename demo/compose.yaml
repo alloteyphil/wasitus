@@ -28,7 +28,7 @@ services:
     environment:
       MOCKPAY_ADDR: ":8090"
       MOCKPAY_MODE: healthy
-    ports: ["8090:8090"]
+    ports: ["127.0.0.1:8090:8090"] # this machine only: /admin/mode has no auth
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/healthz"]
       interval: 10s
@@ -50,6 +50,10 @@ services:
     depends_on:
       mockpay: { condition: service_healthy }
       ingester: { condition: service_started }
+      # The migrator is a one-off job. Waiting for it to *complete* also tells
+      # `docker compose up --wait` not to expect it to keep running; without
+      # this, a restart (migrations already done, job exits at once) fails.
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/healthz"]
       interval: 10s
@@ -75,6 +79,7 @@ services:
     depends_on:
       wallet-service: { condition: service_healthy }
       ingester: { condition: service_started }
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/healthz"]
       interval: 10s
@@ -93,10 +98,11 @@ services:
       APP_VERSION: "1.0.0"
       ORDERS_URL: http://orders-service:8081
       OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-ingester:4318
-    ports: ["8000:8080"]
+    ports: ["127.0.0.1:8000:8080"]
     depends_on:
       orders-service: { condition: service_healthy }
       ingester: { condition: service_started }
+      signoz-telemetrystore-migrator: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 10s

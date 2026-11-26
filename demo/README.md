@@ -13,11 +13,16 @@ Needs Docker with about 6 GB of memory for containers. From the repository root:
 
 ```
 make lab-up      # build and start SigNoz + the lab, wait until healthy
+make lab-smoke   # prove it works: checkouts, a staged failure, traces in SigNoz
 make lab-ps      # what is running
 make lab-logs    # follow the logs
 make lab-down    # stop (data kept)
 make lab-reset   # stop and delete all lab data
 ```
+
+All ports are bound to 127.0.0.1, so only your machine can reach the lab. If
+you ran an earlier version of the lab, start with `make lab-reset`: its
+database was created with a password the lab no longer uses.
 
 | What | Where |
 |---|---|
@@ -36,6 +41,7 @@ demo/
 ├── compose.yaml         # the lab: SigNoz + lab services        (done)
 ├── Dockerfile           # one image recipe for every program    (done)
 ├── signoz/              # SigNoz, pinned (from Foundry)         (done)
+├── scripts/smoke.sh     # end-to-end check of a running lab     (done)
 ├── internal/lab/        # shared: OpenTelemetry, HTTP, errors   (done)
 ├── services/            # the lab's own services                (done)
 │   ├── storefront/

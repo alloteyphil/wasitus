@@ -18,10 +18,12 @@ Changes from that output (everything else is as generated):
 | `compose.yaml` | `signoz/signoz:latest` → `v0.149.0`, `signoz/signoz-otel-collector:latest` → `v0.144.15` (the collector release before that SigNoz release) | `latest` changes under you; the lab must be reproducible |
 | `compose.yaml` | Postgres uses `POSTGRES_HOST_AUTH_METHOD=trust` and SigNoz connects without a password, instead of the literal password `signoz` | No password to store or leak: the database has no published port and is reachable only inside Docker's network |
 | `compose.yaml` | `LOW_CARDINAL_EXCEPTION_GROUPING=false` set on the ingester | `ingester.yaml` reads it, but the generated file never sets it |
+| `compose.yaml` | Published ports bound to `127.0.0.1` (8080, 4317, 4318) instead of all interfaces | A fresh SigNoz lets anyone register as admin until `setup.sh` runs; nobody else on your network should reach it |
 | `compose.yaml` | Header comment | Points here |
 
-Only the UI (8080) and OTLP (4317, 4318) are published to your machine.
-ClickHouse and Postgres are reachable only inside Docker's network.
+Only the UI (8080) and OTLP (4317, 4318) are published, and only on
+127.0.0.1, so they are reachable from your machine alone. ClickHouse and
+Postgres are reachable only inside Docker's network.
 
 ## Upgrading
 

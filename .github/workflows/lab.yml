@@ -37,6 +37,14 @@ jobs:
         run: make lab-up
       - name: Smoke test
         run: demo/scripts/smoke.sh
+      # Stopping and starting again takes a different path (data kept,
+      # migrations already done, SigNoz already set up). It once broke while
+      # fresh starts passed, so test it too.
+      - name: Restart the lab and smoke test again
+        run: |
+          make lab-down
+          make lab-up
+          demo/scripts/smoke.sh
       # `if: failure()` runs only when an earlier step failed: the logs you
       # need to debug it, without cluttering green runs.
       - name: Container status and logs
