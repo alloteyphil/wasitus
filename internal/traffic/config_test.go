@@ -31,7 +31,7 @@ func TestConfigValidate(t *testing.T) {
 		want   []string // substrings of the error; none means valid
 	}{
 		{"one-minute buckets", func(c *Config) { c.BucketSize = time.Minute }, nil},
-		{"one-day buckets", func(c *Config) { c.BucketSize = day }, nil},
+		{"one-hour buckets", func(c *Config) { c.BucketSize = time.Hour }, nil},
 		{"one baseline day", func(c *Config) { c.BaselineDays, c.MinBaselineSamples = 1, 1 }, nil},
 		{"longest baseline", func(c *Config) { c.BaselineDays = maxBaselineDays }, nil},
 		{"tolerance bounds", func(c *Config) { c.MixTolerance = 1 }, nil},
@@ -41,6 +41,10 @@ func TestConfigValidate(t *testing.T) {
 		{"negative bucket size", func(c *Config) { c.BucketSize = -time.Minute }, []string{"bucket size"}},
 		{"bucket size does not divide a day", func(c *Config) { c.BucketSize = 7 * time.Minute }, []string{"divide 24h"}},
 		{"bucket wider than a day", func(c *Config) { c.BucketSize = 2 * day }, []string{"divide 24h"}},
+		{"two-hour buckets", func(c *Config) { c.BucketSize = 2 * time.Hour }, []string{"at most 1h0m0s, got 2h0m0s"}},
+		// From 12h up, one day's neighbouring buckets reach the next day's.
+		{"half-day buckets", func(c *Config) { c.BucketSize = 12 * time.Hour }, []string{"at most 1h0m0s"}},
+		{"one-day buckets", func(c *Config) { c.BucketSize = day }, []string{"at most 1h0m0s"}},
 		{"spike factor of 1", func(c *Config) { c.SpikeFactor = 1 }, []string{"spike factor"}},
 		{"NaN spike factor", func(c *Config) { c.SpikeFactor = math.NaN() }, []string{"spike factor"}},
 		{"infinite spike factor", func(c *Config) { c.SpikeFactor = math.Inf(1) }, []string{"spike factor"}},

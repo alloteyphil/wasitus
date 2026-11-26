@@ -169,6 +169,45 @@ func TestAnalyze(t *testing.T) {
 			reason: "requests 10x the 7-day median for this time of day (12000 vs 1200 expected)",
 		},
 		{
+			// With 12-hour buckets, history on two days (36 and 84 hours
+			// before) would reach three days: each day's neighbouring buckets
+			// overlap the next day's.
+			name:   "two days of history with half-day buckets",
+			window: hour(flat(1000, 20)),
+			history: []Bucket{
+				{Start: at10.Add(-36 * time.Hour), Requests: 100},
+				{Start: at10.Add(-84 * time.Hour), Requests: 100},
+			},
+			cfg:    func(c *Config) { c.BucketSize = 12 * time.Hour },
+			reason: "invalid config: bucket size must be at most 1h0m0s, got 12h0m0s",
+		},
+		{
+			name:    "one day of history with one-day buckets",
+			window:  []Bucket{{Start: at10, Requests: 1000}},
+			history: []Bucket{{Start: at10.Add(-day), Requests: 100}},
+			cfg:     func(c *Config) { c.BucketSize, c.MinBaselineSamples = day, 2 },
+			reason:  "invalid config: bucket size must be at most 1h0m0s, got 24h0m0s",
+		},
+		{
+			// The widest buckets allowed still count each day once.
+			name:    "two days of history with one-hour buckets is too little",
+			window:  series(at10, 1, time.Hour, flat(12000, 240)),
+			history: series(at10.Add(-2*day), 48, time.Hour, flat(1200, 24)),
+			cfg:     func(c *Config) { c.BucketSize = time.Hour },
+
+			windowRequests: 12000, windowBuckets: 1, peak: at10,
+			reason: "too little history: no window bucket has data at this time of day on at least 3 of the previous 7 days",
+		},
+		{
+			name:    "three days of history with one-hour buckets is enough",
+			window:  series(at10, 1, time.Hour, flat(12000, 240)),
+			history: series(at10.Add(-3*day), 72, time.Hour, flat(1200, 24)),
+			cfg:     func(c *Config) { c.BucketSize = time.Hour },
+			spike:   true, factor: 10, windowRequests: 12000, expected: 1200,
+			windowBuckets: 1, baselineBuckets: 1, peak: at10,
+			reason: "requests 10x the 7-day median for this time of day (12000 vs 1200 expected)",
+		},
+		{
 			// 10:30 to 11:00 is missing on 8 to 12 Dec, leaving 2 days. The
 			// buckets at 10:30 and 10:55 still have a neighbour (10:25, 11:00)
 			// on every day; 10:35 to 10:50 do not.
