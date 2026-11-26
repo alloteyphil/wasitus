@@ -1,0 +1,16 @@
+# build output
+/wasitus
+/dist/
+
+# local config and secrets
+.env
+*.local.yaml
+wasitus.yaml
+
+# caches
+.wasitus-cache/
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
