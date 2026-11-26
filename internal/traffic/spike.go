@@ -137,13 +137,15 @@ func Analyze(window, history []Bucket, cfg Config) Result {
 	res.IsSpike = res.Factor >= cfg.SpikeFactor
 
 	res.Reason = fmt.Sprintf("requests %sx the %d-day median for this time of day (%d vs %d expected",
-		formatFactor(res.Factor), cfg.BaselineDays, res.WindowRequests, res.ExpectedRequests)
+		formatFactor(res.Factor, cfg.SpikeFactor), cfg.BaselineDays, res.WindowRequests, res.ExpectedRequests)
 	if b.expected < 1 {
 		res.Reason += "; an expected count under 1 is treated as 1"
 	}
 	res.Reason += ")"
 	if !res.IsSpike {
-		res.Reason += fmt.Sprintf(", below the %sx spike factor", formatFactor(cfg.SpikeFactor))
+		// formatFactor keeps the factor's text below the spike factor's
+		// exact value, so print that value unrounded.
+		res.Reason += fmt.Sprintf(", below the %sx spike factor", strconv.FormatFloat(cfg.SpikeFactor, 'f', -1, 64))
 	}
 	return res
 }
@@ -296,7 +298,15 @@ func roundSat(f float64) int {
 }
 
 // formatFactor writes f with at most two decimals and no trailing zeros:
-// 10.2, 3, 2.96.
-func formatFactor(f float64) string {
-	return strconv.FormatFloat(math.Round(f*100)/100, 'f', -1, 64)
+// 10.2, 3, 2.96. When f is below limit it adds decimals until the text is
+// below limit too, so that a factor of 2.9958 against a limit of 3 reads
+// 2.996, not 3.
+func formatFactor(f, limit float64) string {
+	for prec := 2; prec <= 15; prec++ {
+		p := math.Pow10(prec)
+		if r := math.Round(f*p) / p; f >= limit || r < limit {
+			return strconv.FormatFloat(r, 'f', -1, 64)
+		}
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64) // shortest exact text, so below limit
 }
