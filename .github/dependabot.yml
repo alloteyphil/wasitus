@@ -1,0 +1,26 @@
+# Dependabot opens a pull request when a newer version of an Action or a Go
+# module comes out. CI runs on that PR, so you can see whether the update is
+# safe before merging it. Updates are grouped: one PR per ecosystem per week.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+      include: scope # "ci(deps): ..."
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope # "chore(deps): ..."
