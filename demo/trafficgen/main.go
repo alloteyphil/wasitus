@@ -18,12 +18,22 @@
 //	go run ./trafficgen                          # 5 checkouts a second to localhost:8080
 //	TRAFFIC_RPS=20 TRAFFIC_SEED=42 go run ./trafficgen
 //
+// Change the rate while it runs. The target rate is TRAFFIC_RPS times the
+// multiplier, which must be above 0 and at most 50 (anything else is a 400):
+//
+//	curl -X PUT localhost:8091/admin/rate -d '{"multiplier": 3}'    # S4: traffic x3
+//	curl -X PUT localhost:8091/admin/rate -d '{"multiplier": 10}'   # S6: traffic surge
+//	curl -X PUT localhost:8091/admin/rate -d '{"multiplier": 1}'    # reset
+//	curl localhost:8091/admin/rate
+//	{"multiplier":1,"base_rps":5,"target_rps":5}
+//
 // Settings come from environment variables:
 //
 //	TRAFFIC_TARGET         checkout URL (default "http://localhost:8080/checkout")
 //	TRAFFIC_RPS            base requests per second, at least 1 (default 5)
 //	TRAFFIC_SEED           payload seed, for the same customers and amounts on
 //	                       every run (default: random, and logged at start)
+//	TRAFFIC_ADMIN_ADDR     admin API listen address (default ":8091")
 //	TRAFFIC_MAX_IN_FLIGHT  requests waiting for an answer at once (default 100)
 //	TRAFFIC_TIMEOUT        per-request timeout (default "10s")
 //
@@ -41,15 +51,19 @@
 //
 // completed counts answers by HTTP status code; transport_errors counts
 // requests with no answer at all (timeout, refused connection), with the
-// latest one as last_error. On SIGTERM or Ctrl-C trafficgen stops sending,
-// waits up to 5 seconds for requests in flight, and logs the run's totals.
+// latest one as last_error. Each change of multiplier is logged as "rate
+// changed". On SIGTERM or Ctrl-C trafficgen stops sending, waits up to 5
+// seconds for requests in flight, and logs the run's totals.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -74,7 +88,7 @@ func main() {
 	}
 }
 
-// run sends traffic until ctx is cancelled.
+// run serves the admin API and sends traffic until ctx is cancelled.
 func run(ctx context.Context, log *slog.Logger) error {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -82,19 +96,48 @@ func run(ctx context.Context, log *slog.Logger) error {
 	}
 	gen := NewGenerator(cfg, log)
 
+	// Listen before sending anything, so a busy admin port stops the start
+	// instead of leaving traffic that no scenario can change.
+	ln, err := net.Listen("tcp", cfg.AdminAddr)
+	if err != nil {
+		return fmt.Errorf("admin API: %w", err)
+	}
+	admin := &http.Server{Handler: newAdmin(gen.rate, log), ReadHeaderTimeout: 5 * time.Second}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	adminErr := make(chan error, 1)
+	go func() {
+		if err := admin.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
+			adminErr <- fmt.Errorf("admin API: %w", err)
+			cancel()
+		}
+	}()
+
 	log.Info("trafficgen starting", "target", cfg.Target, "base_rps", cfg.BaseRPS, "seed", cfg.Seed,
-		"max_in_flight", cfg.MaxInFlight, "timeout", cfg.Timeout.String())
+		"max_in_flight", cfg.MaxInFlight, "timeout", cfg.Timeout.String(), "admin_addr", ln.Addr().String())
 
 	ticker := time.NewTicker(tickEvery)
 	defer ticker.Stop()
 	gen.Run(ctx, ticker.C)
-	return nil
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second)
+	defer cancelShutdown()
+	if err := admin.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("admin API shutdown: %w", err)
+	}
+	select {
+	case err := <-adminErr:
+		return err
+	default:
+		return nil
+	}
 }
 
 // loadConfig reads the settings from the environment.
 func loadConfig() (Config, error) {
 	cfg := Config{
 		Target:       lab.Env("TRAFFIC_TARGET", "http://localhost:8080/checkout"),
+		AdminAddr:    lab.Env("TRAFFIC_ADMIN_ADDR", ":8091"),
 		SummaryEvery: 10 * time.Second,
 		Grace:        5 * time.Second,
 	}
