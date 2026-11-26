@@ -36,7 +36,8 @@ agents and reviewers.
    - The PR description says why, what, and how it was tested.
 4. **Dependencies.** Prefer the standard library. A new dependency in the tool's
    `go.mod` needs an ADR. Lab-only dependencies go in `demo/go.mod` (ADR-0006).
-   Pin exact versions released at least two weeks ago.
+   Pin exact versions released at least two weeks ago, except to fix a
+   vulnerability reported by `govulncheck` (take the fixed version at once).
 5. **Shared files.** When several agents work in parallel, they do not edit
    `CHANGELOG.md`, `docs/PLAN.md` or `.github/`. The integrator updates those
    when merging, to avoid conflicts.
