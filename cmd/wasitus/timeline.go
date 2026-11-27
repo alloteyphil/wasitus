@@ -6,10 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/alloteyphil/wasitus/internal/collector"
 	"github.com/alloteyphil/wasitus/internal/collector/changesfile"
+	"github.com/alloteyphil/wasitus/internal/collector/github"
 	"github.com/alloteyphil/wasitus/internal/config"
 	"github.com/alloteyphil/wasitus/internal/event"
 	"github.com/alloteyphil/wasitus/internal/render"
@@ -59,7 +62,11 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 		return exitUsage
 	}
 
-	collectors, notes := buildCollectors(cfg)
+	collectors, notes, err := buildCollectors(cfg, os.LookupEnv)
+	if err != nil {
+		fmt.Fprintf(stderr, "wasitus: %v\n", err)
+		return exitError
+	}
 	for _, n := range notes {
 		fmt.Fprintf(stderr, "note: %s\n", n)
 	}
@@ -91,17 +98,43 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 	return exitOK
 }
 
+// githubAPI is the GitHub REST API root. Tests point it at a local server.
+var githubAPI = github.DefaultBaseURL
+
+// githubRequestTimeout bounds each GitHub request; --timeout bounds the run.
+const githubRequestTimeout = 30 * time.Second
+
 // buildCollectors creates a collector for each configured source that is
-// implemented, and a note for each one that is not implemented yet.
-func buildCollectors(cfg *config.Config) (cs []collector.Collector, notes []string) {
+// implemented, and a note for each one that is not implemented yet. Secrets
+// are read with lookupEnv (normally os.LookupEnv).
+func buildCollectors(cfg *config.Config, lookupEnv func(string) (string, bool)) (cs []collector.Collector, notes []string, err error) {
 	if p := cfg.ChangesFilePath(); p != "" {
 		cs = append(cs, changesfile.New(p, cfg.Location()))
 	}
 	if cfg.Sources.SigNoz != nil {
 		notes = append(notes, "sources.signoz is configured but not supported yet (planned for M2); skipping")
 	}
-	if cfg.Sources.GitHub != nil {
-		notes = append(notes, "sources.github is configured but not supported yet (planned for M2); skipping")
+	if gh := cfg.Sources.GitHub; gh != nil {
+		c, err := newGitHubCollector(gh, cfg.ServiceFor, lookupEnv)
+		if err != nil {
+			return nil, nil, err
+		}
+		cs = append(cs, c)
 	}
-	return cs, notes
+	return cs, notes, nil
+}
+
+// newGitHubCollector reads the token from the environment variable named in
+// the config. A variable that is named but missing or empty is an error, so a
+// typo never silently falls back to anonymous, rate-limited access.
+func newGitHubCollector(gh *config.GitHub, serviceFor func(string) string, lookupEnv func(string) (string, bool)) (*github.Collector, error) {
+	var token string
+	if gh.TokenEnv != "" {
+		t, err := config.Secret(gh.TokenEnv, lookupEnv)
+		if err != nil {
+			return nil, fmt.Errorf("sources.github: %w; it must hold a read-only GitHub token", err)
+		}
+		token = t
+	}
+	return github.New(gh.Repos, token, githubAPI, &http.Client{Timeout: githubRequestTimeout}, serviceFor)
 }
