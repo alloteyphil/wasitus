@@ -6,6 +6,7 @@
 #
 #   storefront   http://localhost:8000/checkout     the customers' way in
 #   mockpay      http://localhost:8090/admin/mode   switch the provider's failure mode
+#   trafficgen   http://localhost:8091/admin/rate   change the customers' rate
 #   SigNoz       http://localhost:8080              traces and logs
 #
 # Service names double as host names inside Docker's network, so
@@ -58,8 +59,10 @@ services:
     volumes: [lab-ca:/run/lab-ca:ro]
     depends_on:
       # restart: a restarted mockpay has a new CA, which wallet-service reads
-      # only at startup; restarting it too avoids "unknown authority" errors
-      # that would look like a different incident.
+      # only at startup. When Compose restarts or recreates mockpay, it
+      # restarts wallet-service too, avoiding "unknown authority" errors that
+      # would look like a different incident. A crash or a plain
+      # `docker restart` bypasses Compose: restart wallet-service by hand.
       mockpay: { condition: service_healthy, restart: true }
       ingester: { condition: service_started }
       # The migrator is a one-off job. Waiting for it to *complete* also tells
