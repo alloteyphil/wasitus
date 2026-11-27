@@ -21,9 +21,10 @@ const (
 	ModeSlow      Mode = "slow"      // charges succeed, but only after a long delay
 	ModeSuspended Mode = "suspended" // 402 AccountSuspended: the lab's account is unpaid
 	ModeRateLimit Mode = "ratelimit" // 429 once the per-window quota is used up
+	ModeBadCert   Mode = "badcert"   // HTTPS serves an expired certificate; plain HTTP is unchanged
 )
 
-var allModes = []Mode{ModeHealthy, ModeOutage, ModeSlow, ModeSuspended, ModeRateLimit}
+var allModes = []Mode{ModeHealthy, ModeOutage, ModeSlow, ModeSuspended, ModeRateLimit, ModeBadCert}
 
 func parseMode(s string) (Mode, error) {
 	for _, m := range allModes {
@@ -74,14 +75,36 @@ func NewServer(cfg Config, mode Mode, log *slog.Logger, now func() time.Time) *S
 	return &Server{cfg: cfg, mode: mode, log: log, now: now}
 }
 
-// Handler returns the HTTP routes.
+// Mode returns the current mode.
+func (s *Server) Mode() Mode {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mode
+}
+
+// Handler returns the routes, for plain HTTP and HTTPS alike.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/charges", s.createCharge)
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /admin/mode", s.getMode)
 	mux.HandleFunc("PUT /admin/mode", s.setMode)
-	return s.logRequests(mux)
+	return s.logRequests(s.closeTLSInBadCert(mux))
+}
+
+// closeTLSInBadCert tells clients to drop HTTPS connections they opened
+// before the switch to badcert. Those connections passed their handshake
+// with the valid certificate, and a client reuses an open connection for as
+// long as it can, so it would never see the expired one. The request is
+// answered as usual; the client's next request needs a new connection, and
+// that handshake fails.
+func (s *Server) closeTLSInBadCert(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS != nil && s.Mode() == ModeBadCert {
+			w.Header().Set("Connection", "close")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // apiError is the error format clients see, modelled on real payment APIs:
@@ -117,7 +140,8 @@ type failure struct {
 }
 
 // decide applies the current mode to one incoming charge: how long to wait
-// first, and whether to fail. It updates the mode's counters.
+// first, and whether to fail. It updates the mode's counters. badcert does
+// nothing here: it fails the TLS handshake (TLSConfig), before any request.
 func (s *Server) decide() (delay time.Duration, fail *failure) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -243,10 +267,7 @@ type modeBody struct {
 }
 
 func (s *Server) getMode(w http.ResponseWriter, _ *http.Request) {
-	s.mu.Lock()
-	mode := s.mode
-	s.mu.Unlock()
-	writeJSON(w, http.StatusOK, modeBody{Mode: mode})
+	writeJSON(w, http.StatusOK, modeBody{Mode: s.Mode()})
 }
 
 // setMode switches the failure mode and resets its counters, so every staged

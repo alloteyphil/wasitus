@@ -110,6 +110,7 @@ func TestChargeByMode(t *testing.T) {
 		{ModeSuspended, http.StatusPaymentRequired, "AccountSuspended"},
 		{ModeOutage, http.StatusServiceUnavailable, "ServiceUnavailable"},
 		{ModeRateLimit, http.StatusCreated, ""}, // first charge is within the quota
+		{ModeBadCert, http.StatusCreated, ""},   // only HTTPS is affected
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.mode), func(t *testing.T) {
