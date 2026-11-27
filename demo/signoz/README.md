@@ -40,7 +40,9 @@ it is already done, so running it again changes nothing.
    SigNoz evaluates data with a 2-minute delay (docs/adr/0007-signoz-api.md).
 3. **A read-only API key for wasitus**: a service account `wasitus-reader`
    with SigNoz's viewer role, its key saved as `SIGNOZ_API_KEY` in
-   `demo/.env`. SigNoz refuses any change made with it.
+   `demo/.env`, valid for 90 days. SigNoz refuses any change made with it,
+   but it can read all telemetry in this SigNoz (a viewer key can even run raw
+   ClickHouse queries), so treat it like any other credential.
 
 All three are made with the API calls recorded in ADR-0007.
 

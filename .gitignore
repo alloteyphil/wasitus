@@ -8,6 +8,7 @@ coverage.out
 
 # local config and secrets
 .env
+.env.*
 *.local.yaml
 /wasitus.yaml
 

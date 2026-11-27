@@ -15,7 +15,7 @@ pinned version) against its source and a live lab. What it found:
   role (`signoz-viewer`), and creates a key, which is shown once. The key is
   sent as `SigNoz-Api-Key: <key>`; sent as a bearer token it is rejected.
 - **Query API.** `POST /api/v5/query_range` is the only query endpoint in
-  SigNoz's OpenAPI spec. `/api/v3` and `/api/v4/query_range` still answer but are
+  SigNoz's OpenAPI spec. `/api/v3/query_range` and `/api/v4/query_range` still answer but are
   legacy (values as strings, unsorted). A viewer key can run every query wasitus
   needs, and also raw ClickHouse SQL.
 - **Alert history** exists only per rule:
@@ -77,8 +77,9 @@ pinned version) against its source and a live lab. What it found:
 
 ## Consequences
 - A team can give wasitus read-only access without sharing a person's login.
-  But in v0.149.0 a viewer key can also run raw ClickHouse SQL; the README must
-  say what the key can read.
+  But in v0.149.0 a viewer key can also run raw ClickHouse SQL, so it can read
+  all telemetry in that SigNoz. demo/signoz/README.md says so for the lab; the
+  user-facing README must say it too when the SigNoz source ships (M2).
 - Alert history costs one request per rule, because the `states` filter of
   `/api/v3/rules` is about the current state, not the past. That is fine for
   tens of rules; with hundreds, wasitus will need a concurrency limit.
@@ -97,7 +98,7 @@ pinned version) against its source and a live lab. What it found:
   (except through raw SQL on SigNoz's internal tables, which wasitus will not
   depend on); 5-minute buckets over 7 days in one query; exception fields as
   span columns.
-- Legacy endpoints (`/api/v3` and `/api/v4/query_range`, `/api/v1/rules`,
+- Legacy endpoints (`/api/v3/query_range` and `/api/v4/query_range`, `/api/v1/rules`,
   `/api/v1/listErrors`) are not used, so their removal will not break wasitus.
 - Other SigNoz versions need their own check; wasitus reads `/api/v1/version`
   and warns when it is not a version it was tested with.
