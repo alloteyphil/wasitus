@@ -28,6 +28,7 @@ database was created with a password the lab no longer uses.
 |---|---|
 | Checkout (the customers' way in) | `curl -X POST localhost:8000/checkout -d '{"customer_id":"cus_42","amount":2500,"currency":"GHS"}'` |
 | Switch mockpay's failure mode | `curl -X PUT localhost:8090/admin/mode -d '{"mode":"suspended"}'` |
+| Change the customers' rate (S4 x3, S6 x10) | `curl -X PUT localhost:8091/admin/rate -d '{"multiplier": 10}'` |
 | SigNoz (traces, logs) | http://localhost:8080 |
 | A staged bad deploy (S1) | `ORDERS_VERSION=1.4.0 ORDERS_BUG_EVERY=5 docker compose -f demo/compose.yaml up -d orders-service` |
 
@@ -50,7 +51,7 @@ demo/
 │   ├── orders/
 │   └── wallet/
 ├── mockpay/             # fake external payment provider        (done)
-├── trafficgen/                                                 (coming)
+├── trafficgen/          # the customers: steady checkouts         (done)
 └── scenarios/           # S1..S8 stage/reset scripts            (coming)
 ```
 
@@ -65,7 +66,8 @@ customer ─► storefront ─► orders-service ─► wallet-service ─► mo
 |---|---|---|
 | `storefront` | `POST /checkout`; places the order | `ORDERS_URL`, `STOREFRONT_ORDERS_TIMEOUT` (8s) |
 | `orders-service` | `POST /orders`; pays through the wallet | `WALLET_URL`, `ORDERS_WALLET_TIMEOUT` (5s), `ORDERS_BUG_EVERY` (0) |
-| `wallet-service` | `POST /payments`; charges mockpay | `MOCKPAY_URL`, `WALLET_PROVIDER_TIMEOUT` (3s) |
+| `wallet-service` | `POST /payments`; charges mockpay | `MOCKPAY_URL`, `MOCKPAY_CA_FILE` (a CA to trust for https), `WALLET_PROVIDER_TIMEOUT` (3s) |
+| `trafficgen` | the customers: `POST /checkout` at a steady rate (2/s in Docker) | `TRAFFIC_TARGET`, `TRAFFIC_RPS`, `TRAFFIC_ADMIN_ADDR` (:8091), `TRAFFIC_SEED`, `TRAFFIC_MAX_IN_FLIGHT`, `TRAFFIC_TIMEOUT` |
 
 Each service sends traces and logs to SigNoz when `OTEL_EXPORTER_OTLP_ENDPOINT`
 is set, and always logs JSON to stdout. A checkout is one trace across all
@@ -108,7 +110,7 @@ services see when they call it.
 | `slow` | `201`, but only after 6 seconds | |
 | `suspended` | `402 AccountSuspended` | S3, S7 |
 | `ratelimit` | `429 RateLimited` with `Retry-After` after 60 calls a minute | S4 |
-| `badcert` | expired TLS certificate | S5 (coming in its own PR) |
+| `badcert` | over HTTPS, an expired certificate: `x509: certificate has expired` (plain HTTP is unaffected) | S5 |
 
 Run it and switch modes:
 
@@ -124,6 +126,11 @@ curl localhost:8090/admin/mode
 
 Settings: `MOCKPAY_ADDR` (default `:8090`), `MOCKPAY_MODE` (default `healthy`),
 `MOCKPAY_SLOW_DELAY` (default `6s`), `MOCKPAY_RATE_LIMIT` (charges per minute,
-default `60`). Switching mode resets the rate-limit window and the outage
+default `60`), and for HTTPS `MOCKPAY_TLS_ADDR` (default `:8443`),
+`MOCKPAY_TLS_HOSTS` (default `localhost,127.0.0.1,mockpay`) and
+`MOCKPAY_CA_OUT` (where to write the lab CA certificate). mockpay creates a
+new lab CA at every start; in Docker it shares the certificate (public part
+only) with wallet-service through the `lab-ca` volume, and wallet-service
+calls `https://mockpay:8443`. Private keys never leave mockpay's memory. Switching mode resets the rate-limit window and the outage
 counter, so every staged scenario starts from the same state. `/healthz`
 answers `ok` in every mode, so Docker never restarts mockpay mid-scenario.
