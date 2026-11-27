@@ -167,6 +167,7 @@ the data. See [docs/PRIOR_ART.md](docs/PRIOR_ART.md).
 | [docs/PLAN.md](docs/PLAN.md) | Goals, milestones, timeline, portfolio deliverables |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: pipeline, event model, verdict logic |
 | [docs/SCENARIOS.md](docs/SCENARIOS.md) | Staged incidents and the verdict each must produce |
+| [docs/writeups/was-it-us.md](docs/writeups/was-it-us.md) | Design write-up: was it us vs someone else |
 | [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | Existing tools and how this one differs |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 
