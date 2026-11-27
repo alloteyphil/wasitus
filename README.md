@@ -9,14 +9,15 @@ your observability and change data, then tells you where the evidence points:
 
 It is read-only, runs on your own machine, and sends your data nowhere.
 
-> **Status: shipping v0.1.0 (M5).** Feature-complete through M4; release packaging
-> and docs are in progress. `wasitus` collects signals from SigNoz (alerts, error
-> spans/logs, request-rate traffic), GitHub (merged PRs, deployments, releases),
-> and a local changes file, then fingerprints errors, checks for traffic spikes,
-> correlates recent changes, and produces a deterministic verdict in table,
-> Markdown, or JSON format with PII redaction on by default. All 8/8 synthetic
-> staged scenarios in [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. See
-> [docs/PLAN.md](docs/PLAN.md).
+> **Status: v0.1.0 shipped.** Install via Homebrew or
+> [GitHub Releases](https://github.com/alloteyphil/wasitus/releases/tag/v0.1.0).
+> `wasitus` collects signals from SigNoz (alerts, error spans/logs, request-rate
+> traffic), GitHub (merged PRs, deployments, releases), and a local changes
+> file, then fingerprints errors, checks for traffic spikes, correlates recent
+> changes, and produces a deterministic verdict in table, Markdown, or JSON
+> format with PII redaction on by default. All 8/8 synthetic staged scenarios in
+> [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. Roadmap after v0.1:
+> [docs/PLAN.md](docs/PLAN.md) §5b.
 
 ## Install
 

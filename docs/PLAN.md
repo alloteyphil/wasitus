@@ -126,16 +126,20 @@ timeline, and the collector tests run offline.
 
 **Done when:** 8/8 scenarios produce the expected verdict in CI.
 
-### M5: Ship v0.1 (in progress, 27 Nov 2026)
+### M5: Ship v0.1 (done 27 Nov 2026)
 - [x] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
+      ([release](https://github.com/alloteyphil/wasitus/releases/tag/v0.1.0),
+      [homebrew-wasitus](https://github.com/alloteyphil/homebrew-wasitus))
 - [x] README with demo GIF and 10-minute quickstart against the lab
 - [x] Design write-up / blog post: "Was it us? Telling our failures from someone
       else's" ([docs/writeups/was-it-us.md](writeups/was-it-us.md))
-- [ ] Add the project to the portfolio site (`../portfolio`)
-- [ ] Share: LinkedIn post, SigNoz and OpenTelemetry community channels
+- [x] Add the project to the portfolio site (`../portfolio`)
+- [x] Share drafts: LinkedIn + SigNoz/OTel blurbs
+      ([docs/devlog/2026-11-27-v0.1-ship.md](devlog/2026-11-27-v0.1-ship.md))
+      — posting is manual
 
 **Done when:** a stranger can install it, run the lab, and reproduce a verdict
-without asking me anything.
+without asking me anything. Met for v0.1.0.
 
 ## 5. Timeline at a glance
 
@@ -146,7 +150,25 @@ without asking me anything.
 | 3 | 12–13 Dec | M2 Timeline |
 | 4–5 | 19 Dec – 10 Jan | M3 Fingerprinting (holiday slack built in) |
 | 6 | 17 Jan | M4 Verdict |
-| 7 | 24–31 Jan | M5 Ship v0.1 |
+| 7 | 24–31 Jan → **done early 27 Nov** | M5 Ship v0.1 |
+
+## 5b. Version vision (after v0.1)
+
+v0.1 proved the thesis for a **narrow niche**: OTel/SigNoz + GitHub, deterministic
+"our change vs external" verdicts, honest `UNKNOWN`. It will not be mass-market
+until more backends and lower friction exist. Ship versions that widen the wedge
+without diluting the deterministic core ([ADR-0004](adr/0004-deterministic-verdict.md)).
+
+| Version | Goal | In scope | Exit criteria |
+|---|---|---|---|
+| **v0.1** (shipped) | Prove the thesis | SigNoz + GitHub + changes file, lab S1–S8, brew/GitHub release | Stranger installs and reproduces a verdict |
+| **v0.2** | Cheap external evidence | Status-page JSON feeds; cert/domain/token expiry checks; synthetic dependency probes | ≥2 new EXTERNAL scenarios green in CI without blaming deploys |
+| **v0.3** | Meet teams where they work | Slack (or similar) Markdown output; second observability backend (Prometheus or Grafana) | One non-SigNoz path documented end-to-end |
+| **v0.4** | Cloud / change depth | AWS Health + CloudTrail (or equivalent) collectors; richer change_type rules | S7-style red-herring still passes with cloud noise |
+| **v1.0** | Agent- and team-ready | Opt-in AI summary that cannot change the verdict; MCP server mode; Datadog or equivalent optional backend | v0.1 scenarios still pass; summary cites evidence only |
+
+Hard rules that survive every version: read-only collectors, own-data lab, no
+employer data, verdicts stay deterministic, AI never decides.
 
 ## 6. How I'll work (senior habits, visible in the repo)
 
@@ -161,18 +183,19 @@ without asking me anything.
 - **Weekly note** in `docs/devlog/` (5 lines: what shipped, what I learned, what's
   next). This feeds the blog post later.
 
-## 7. Backlog (after v0.1)
+## 7. Backlog (mapped to versions)
 
-| Item | Why it matters |
-|---|---|
-| Synthetic dependency probes | Catches provider outages when the provider has no status page |
-| Status-page feeds (Statuspage-style JSON) | Cheap external evidence |
-| Certificate, domain and token expiry checks | A common, embarrassing cause |
-| AWS Health + CloudTrail collectors | Cloud outages and config changes |
-| Prometheus/Grafana and Datadog backends | Users beyond SigNoz |
-| AI-written incident summary (opt-in) | Readable post-incident draft; cites evidence only |
-| Slack output | Teams live there during incidents |
-| MCP server mode | Lets AI agents call `wasitus` during investigations |
+| Item | Target | Why it matters |
+|---|---|---|
+| Synthetic dependency probes | v0.2 | Catches provider outages when the provider has no status page |
+| Status-page feeds (Statuspage-style JSON) | v0.2 | Cheap external evidence |
+| Certificate, domain and token expiry checks | v0.2 | A common, embarrassing cause |
+| Slack (or chat) output | v0.3 | Teams live there during incidents |
+| Prometheus/Grafana backend | v0.3 | Users beyond SigNoz |
+| AWS Health + CloudTrail collectors | v0.4 | Cloud outages and config changes |
+| Datadog (or equivalent) backend | v1.0 | Broader adoption path |
+| AI-written incident summary (opt-in) | v1.0 | Readable post-incident draft; cites evidence only |
+| MCP server mode | v1.0 | Lets AI agents call `wasitus` during investigations |
 
 ## 8. Risks
 
