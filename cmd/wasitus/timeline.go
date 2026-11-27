@@ -131,6 +131,9 @@ func buildCollectors(cfg *config.Config, lookupEnv func(string) (string, bool)) 
 		}
 		cs = append(cs, c)
 	}
+	if len(cs) == 0 {
+		return nil, errors.New("no collectors configured for the enabled sources")
+	}
 	return cs, nil
 }
 
