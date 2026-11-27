@@ -99,4 +99,30 @@
 // UUIDs become <uuid>, timestamps <time>, IPv4 addresses <ip>, prefixed IDs
 // such as ord_000123 <id>, hex IDs <hex> and other numbers <n>. A sample
 // without a message is signed by its exception type and HTTP status instead.
+// Different failures with the same text (only the status or an index
+// differs) share a group within one class and service.
+//
+// # What callers must handle
+//
+// Classification looks at one sample at a time, so some judgements need the
+// caller:
+//
+//   - Pass-through calls. When a provider fails, each of our services in the
+//     chain also has a failed client span to the next of our services, often
+//     with only a status code. Those are ClassCode (a call to our own host),
+//     so counted as they are they inflate the code share during an external
+//     incident. The caller should drop client spans to internal hosts that
+//     carry no message, or count failures per trace by their root cause.
+//   - Missing context. Timeouts and unreachable hosts count as dependency only
+//     when a third-party peer is known: the server address of a client span,
+//     or a URL in the message. If messages are truncated before the URL,
+//     those errors fall back to code.
+//   - Host names. A service reached by IP address, or a client span with no
+//     server address and no URL, is treated as a third party unless the
+//     address is listed in Options.InternalHosts.
+//   - Words without a peer. "ServiceUnavailable", the account words and the
+//     limit words match whichever service reports them, because propagated
+//     provider errors carry no URL to check. Our own service returning
+//     "HTTP 503 ServiceUnavailable" would therefore count as dependency; a
+//     user rule can override this for such a service.
 package fingerprint

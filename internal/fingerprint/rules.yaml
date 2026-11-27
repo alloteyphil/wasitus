@@ -25,6 +25,9 @@
       # runtime.boundsError (index out of range), runtime.errorString (nil
       # pointer), *runtime.TypeAssertionError, and so on.
       - exception_type_contains: "runtime."
+      # The same panic logged without an exception type: Go always writes
+      # "runtime error: ...". It must win over any provider word in the text.
+      - message_contains: "runtime error:"
 
 # --- account ------------------------------------------------------------------
 
@@ -77,14 +80,14 @@
   match:
     any:
       # Go: "tls: failed to verify certificate: x509: certificate has expired
-      # or is not yet valid". Other x509 failures (unknown authority, wrong
-      # host name) are certificate problems too.
-      - message_contains: "x509:"
-      - message_contains: "tls: failed to verify certificate"
+      # or is not yet valid"; OpenSSL: "certificate verify failed
+      # (certificate has expired)". Only expiry wording counts: other x509
+      # failures (unknown authority, wrong host name) can be our own trust
+      # store or configuration, so they fall through to the fallbacks.
       - message_contains: "certificate has expired"
       - message_contains: "certificate expired"
+      - message_contains: "not yet valid"
       - message_contains: "CERT_HAS_EXPIRED"
-      - message_contains: "certificate verify failed"
 
 - id: expiry-token-or-key
   class: expiry
