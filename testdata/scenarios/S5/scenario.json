@@ -1,0 +1,38 @@
+{
+  "id": "S5",
+  "name": "Expired certificate",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "expiry",
+  "expected_label": "EXTERNAL / expiry",
+  "expected_evidence_substrings": [
+    "classified as expiry",
+    "x509"
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "wallet-service",
+      "fired_at": "2026-11-26T09:02:00Z",
+      "value": 100.0
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 12,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "exception_type": "*url.Error",
+      "message": "could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid"
+    }
+  ],
+  "traffic": {
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 600 }
+  }
+}

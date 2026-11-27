@@ -36,6 +36,11 @@ TIME   KIND      SOURCE        SERVICE         EVENT
 Exit codes: `0` success, `1` error, `2` bad command line, `3` result produced
 but some sources failed.
 
+Output formats: `--format table` (default), `--format markdown` (for
+post-incident reviews), and `--format json` (for scripts and other tools).
+Personal data and secrets (emails, phone numbers, card numbers, tokens) are
+redacted by default; pass `--no-redact` to disable redaction locally.
+
 ### SigNoz permissions
 
 Give `wasitus` an API key for a SigNoz service account with the `signoz-viewer`

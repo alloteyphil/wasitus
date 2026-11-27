@@ -1,0 +1,50 @@
+{
+  "id": "S8",
+  "name": "Unclear",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "UNKNOWN",
+  "expected_cause": "",
+  "expected_label": "UNKNOWN",
+  "expected_evidence_substrings": [
+    "no error class reached 60%"
+  ],
+  "error_spans": [
+    {
+      "count": 2,
+      "start": "2026-11-26T09:01:00Z",
+      "step_seconds": 30,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "500",
+      "exception_type": "*errors.errorString",
+      "message": "orders-service fault injected: internal error"
+    },
+    {
+      "count": 2,
+      "start": "2026-11-26T09:04:00Z",
+      "step_seconds": 30,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "503",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 503 ServiceUnavailable: Payments are temporarily unavailable."
+    },
+    {
+      "count": 2,
+      "start": "2026-11-26T09:07:00Z",
+      "step_seconds": 30,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "429",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 429 RateLimited: Too many requests."
+    }
+  ],
+  "traffic": {
+    "orders-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 2 },
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 4 }
+  }
+}

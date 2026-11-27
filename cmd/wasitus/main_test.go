@@ -95,7 +95,7 @@ func TestTimelineConfigProblems(t *testing.T) {
 	if code != exitError || !strings.Contains(errOut, "read config") {
 		t.Errorf("exit %d, stderr %q; want exit %d and read config", code, errOut, exitError)
 	}
-	if _, err := buildCollectors(&config.Config{}, os.LookupEnv); err == nil || !strings.Contains(err.Error(), "no collectors configured") {
+	if _, _, err := buildCollectors(&config.Config{}, os.LookupEnv); err == nil || !strings.Contains(err.Error(), "no collectors configured") {
 		t.Errorf("buildCollectors(empty) error = %v, want no collectors configured", err)
 	}
 }

@@ -1,0 +1,28 @@
+{
+  "id": "S6",
+  "name": "Traffic surge",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "traffic",
+  "expected_label": "EXTERNAL / traffic",
+  "expected_evidence_substrings": [
+    "10x",
+    "no new error classes appeared"
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-lat",
+      "rule_name": "Lab latency",
+      "severity": "warning",
+      "service": "storefront",
+      "fired_at": "2026-11-26T09:03:00Z",
+      "value": 1250.0
+    }
+  ],
+  "traffic": {
+    "storefront":     { "baseline_req": 600, "baseline_err": 0, "window_req": 6000, "window_err": 0 },
+    "orders-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 6000, "window_err": 0 },
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 6000, "window_err": 0 }
+  }
+}
