@@ -31,9 +31,20 @@ func JSON(w io.Writer, t Timeline) error {
 	if loc == nil {
 		loc = time.UTC
 	}
-	events := t.Events
-	if events == nil {
-		events = []event.Event{}
+	events := make([]event.Event, len(t.Events))
+	for i, e := range t.Events {
+		e.Time = e.Time.UTC()
+		if e.End != nil {
+			end := e.End.UTC()
+			e.End = &end
+		}
+		events[i] = e
+	}
+	verdict := t.Verdict
+	if verdict != nil && verdict.Evidence == nil {
+		cp := *verdict
+		cp.Evidence = []string{}
+		verdict = &cp
 	}
 	rep := jsonReport{
 		Window: jsonWindow{
@@ -44,7 +55,7 @@ func JSON(w io.Writer, t Timeline) error {
 		},
 		Events:      events,
 		ErrorGroups: t.ErrorGroups,
-		Verdict:     t.Verdict,
+		Verdict:     verdict,
 		Warnings:    t.Warnings,
 	}
 	enc := json.NewEncoder(w)
