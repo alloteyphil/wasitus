@@ -9,14 +9,53 @@ your observability and change data, then tells you where the evidence points:
 
 It is read-only, runs on your own machine, and sends your data nowhere.
 
-> **Status: v0.1 feature-complete (M0–M4 done, preparing v0.1.0 release).**
-> `wasitus` collects signals from SigNoz (alerts, error spans/logs, request-rate
-> traffic), GitHub (merged PRs, deployments, releases), and a local changes
-> file, then fingerprints errors, checks for traffic spikes, correlates recent
-> changes, and produces a deterministic verdict in table, Markdown, or JSON
-> format with PII redaction on by default. All 8/8 synthetic staged scenarios in
-> [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. See
+> **Status: shipping v0.1.0 (M5).** Feature-complete through M4; release packaging
+> and docs are in progress. `wasitus` collects signals from SigNoz (alerts, error
+> spans/logs, request-rate traffic), GitHub (merged PRs, deployments, releases),
+> and a local changes file, then fingerprints errors, checks for traffic spikes,
+> correlates recent changes, and produces a deterministic verdict in table,
+> Markdown, or JSON format with PII redaction on by default. All 8/8 synthetic
+> staged scenarios in [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. See
 > [docs/PLAN.md](docs/PLAN.md).
+
+## Install
+
+**Go (1.22+):**
+
+```
+go install github.com/alloteyphil/wasitus/cmd/wasitus@latest
+wasitus version
+```
+
+Pin a release once `v0.1.0` is tagged:
+
+```
+go install github.com/alloteyphil/wasitus/cmd/wasitus@v0.1.0
+```
+
+**GitHub Release binaries** (macOS, Linux, Windows; amd64 and arm64): download
+from [Releases](https://github.com/alloteyphil/wasitus/releases), verify
+`checksums.txt`, unpack, and put `wasitus` on your `PATH`. On macOS, clear the
+quarantine flag if Gatekeeper blocks the binary:
+
+```
+xattr -d com.apple.quarantine wasitus
+```
+
+**Homebrew** (after the first release assets exist):
+
+```
+brew install alloteyphil/wasitus/wasitus
+```
+
+**From source:**
+
+```
+git clone https://github.com/alloteyphil/wasitus.git
+cd wasitus
+go build -o wasitus ./cmd/wasitus
+./wasitus version   # prints 0.0.0-dev unless built with -ldflags -X main.version=...
+```
 
 ## Try it
 
