@@ -172,11 +172,45 @@ func redactAWSKeyIDs(s string) string {
 	return replaceMatches(s, awsKeyIDRe, 0, token, nil)
 }
 
+// redactEmails replaces email addresses. Two things that look like one are
+// kept: file names (logo@2x.png), and the user@host of a remote, which is a
+// login name and a host rather than a mailbox: ssh://git@github.com/org/repo
+// (user info right after "://") and git@github.com:org/repo.git (followed by
+// ':' and a path). An address followed by ": " is still an address.
 func redactEmails(s string) string {
-	return replaceMatches(s, emailRe, 0, email, func(m string) bool {
-		tld := m[strings.LastIndexByte(m, '.')+1:]
-		return fileExtensions[strings.ToLower(tld)]
-	})
+	matches := emailRe.FindAllStringIndex(s, -1)
+	if matches == nil {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, m := range matches {
+		if isFileName(s[m[0]:m[1]]) || isRemoteLogin(s, m[0], m[1]) {
+			continue
+		}
+		b.WriteString(s[last:m[0]])
+		b.WriteString(email)
+		last = m[1]
+	}
+	if last == 0 {
+		return s
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+func isFileName(m string) bool {
+	return fileExtensions[strings.ToLower(m[strings.LastIndexByte(m, '.')+1:])]
+}
+
+// isRemoteLogin reports whether the email-like s[start:end] is the user@host
+// of a URL or an scp-style remote.
+func isRemoteLogin(s string, start, end int) bool {
+	if strings.HasSuffix(s[:start], "://") {
+		return true
+	}
+	return end+1 < len(s) && s[end] == ':' && s[end+1] != ' ' && s[end+1] != '\t' &&
+		s[end+1] != '\n' && s[end+1] != '\r'
 }
 
 // replaceMatches replaces submatch group of every match of re in s with
