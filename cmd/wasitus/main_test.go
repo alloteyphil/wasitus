@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alloteyphil/wasitus/internal/config"
 	"github.com/alloteyphil/wasitus/internal/golden"
 )
 
@@ -93,6 +94,9 @@ func TestTimelineConfigProblems(t *testing.T) {
 	code, _, errOut := runCLI("timeline", "--config", filepath.Join(dir, "nope.yaml"), "--from", "-1h")
 	if code != exitError || !strings.Contains(errOut, "read config") {
 		t.Errorf("exit %d, stderr %q; want exit %d and read config", code, errOut, exitError)
+	}
+	if _, err := buildCollectors(&config.Config{}, os.LookupEnv); err == nil || !strings.Contains(err.Error(), "no collectors configured") {
+		t.Errorf("buildCollectors(empty) error = %v, want no collectors configured", err)
 	}
 }
 
