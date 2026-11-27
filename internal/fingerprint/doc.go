@@ -84,4 +84,19 @@
 // When no rule matches, an outbound sample whose host is not one of ours (or
 // is unknown) is ClassDependency, reported as rule FallbackOutbound; any other
 // sample, inbound or a call to our own host, is ClassCode (FallbackOurs).
+//
+// # Groups
+//
+// RuleSet.Group classifies a set of samples and groups them by class, service
+// and signature, with each group's share of all samples and each class's
+// share (Report.Shares), which is the evidence the verdict weighs. The
+// signature is the message with its variable parts replaced, so one error
+// seen for many orders is one group:
+//
+//	message:   payment for ord_000123 failed after 2026-11-26T10:00:00Z: HTTP 504
+//	signature: payment for <id> failed after <time>: HTTP <n>
+//
+// UUIDs become <uuid>, timestamps <time>, IPv4 addresses <ip>, prefixed IDs
+// such as ord_000123 <id>, hex IDs <hex> and other numbers <n>. A sample
+// without a message is signed by its exception type and HTTP status instead.
 package fingerprint
