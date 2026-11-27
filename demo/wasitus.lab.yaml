@@ -1,0 +1,13 @@
+# Config for the local demo lab (make lab-up).
+# Load the lab's SigNoz key from demo/.env into your shell first:
+#   set -a && source demo/.env && set +a
+#   wasitus timeline --config demo/wasitus.lab.yaml --from -30m
+
+timezone: UTC
+lookback: 60m
+
+sources:
+  signoz:
+    url: http://localhost:8080
+    api_key_env: SIGNOZ_API_KEY
+  changes_file: scenarios/changes.yaml
