@@ -1,0 +1,78 @@
+{
+  "window": {
+    "from": "2026-11-14T03:00:00Z",
+    "to": "2026-11-14T04:00:00Z",
+    "lookback": "60m",
+    "timezone": "UTC"
+  },
+  "events": [
+    {
+      "id": "1",
+      "time": "2026-11-14T02:31:00Z",
+      "kind": "change",
+      "source": "github",
+      "service": "orders-service",
+      "title": "Merged PR #12: refactor order validation",
+      "severity": "",
+      "link": "https://github.com/alloteyphil/wasitus/pull/12"
+    },
+    {
+      "id": "2",
+      "time": "2026-11-14T02:47:00Z",
+      "kind": "change",
+      "source": "github",
+      "service": "orders-service",
+      "title": "Deploy orders-service v1.4.0",
+      "severity": ""
+    },
+    {
+      "id": "3",
+      "time": "2026-11-14T03:05:00Z",
+      "kind": "external",
+      "source": "changes-file",
+      "title": "mockpay status page:\n\tdegraded   payments",
+      "severity": ""
+    },
+    {
+      "id": "4",
+      "time": "2026-11-14T03:09:00Z",
+      "kind": "symptom",
+      "source": "signoz",
+      "service": "wallet-service",
+      "title": "Alert FIRED: High 5xx rate",
+      "severity": "",
+      "link": "http://localhost:8080/traces-explorer?rule=1(a)"
+    }
+  ],
+  "error_groups": [
+    {
+      "class": "account",
+      "service": "wallet-service",
+      "signature": "mockpay rejected the charge: HTTP <n> AccountSuspended",
+      "rule_id": "account-suspended",
+      "count": 28,
+      "share": 0.9333
+    },
+    {
+      "class": "code",
+      "signature": "unexpected nil | empty body",
+      "rule_id": "fallback-ours",
+      "count": 2,
+      "share": 0.0667
+    }
+  ],
+  "verdict": {
+    "label": "EXTERNAL / account",
+    "side": "EXTERNAL",
+    "cause": "account",
+    "confidence": "high",
+    "evidence": [
+      "93% of errors (28/30) classified as account",
+      "top error group in wallet-service: mockpay rejected the charge: HTTP <n> AccountSuspended (28 occurrences, rule account-suspended)",
+      "recent change \"Deploy orders-service v1.4.0\" (score 0.82) was not blamed because 93% of errors are account failures"
+    ]
+  },
+  "warnings": [
+    "signoz: SigNoz version v0.151.0 differs from tested version v0.149.0; API behavior may vary"
+  ]
+}

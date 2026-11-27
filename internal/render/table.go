@@ -3,23 +3,32 @@ package render
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/alloteyphil/wasitus/internal/event"
+	"github.com/alloteyphil/wasitus/internal/redact"
 )
 
-// Timeline is everything a renderer needs to print a timeline.
+// Timeline is everything a renderer needs to print a timeline and optional
+// error groups, verdict, and warnings.
 type Timeline struct {
-	Window   event.Window   // the window the user asked for, without lookback
-	Lookback time.Duration  // how far before Window.From events were collected
-	Location *time.Location // zone used to display times
-	Events   []event.Event  // sorted
+	Window      event.Window     // the window the user asked for, without lookback
+	Lookback    time.Duration    // how far before Window.From events were collected
+	Location    *time.Location   // zone used to display times
+	Events      []event.Event    // sorted
+	ErrorGroups []ErrorGroup     // optional grouped error signatures
+	Verdict     *Verdict         // optional verdict summary
+	Warnings    []string         // optional non-fatal warnings (rendered in Markdown and JSON)
+	Redactor    *redact.Redactor // optional PII/secret redactor; nil disables redaction
 }
 
-// Table writes the timeline as an aligned plain-text table for the terminal.
+// Table writes the timeline (and any error groups and verdict) as aligned
+// plain-text tables for the terminal.
 func Table(w io.Writer, t Timeline) error {
+	t = redactTimeline(t)
 	loc := t.Location
 	if loc == nil {
 		loc = time.UTC
@@ -30,26 +39,61 @@ func Table(w io.Writer, t Timeline) error {
 		return err
 	}
 	if len(t.Events) == 0 {
-		_, err := fmt.Fprintln(w, "No events in this window.")
-		return err
-	}
-
-	layout := "15:04"
-	if !sameDay(from.Add(-t.Lookback), to) {
-		layout = "Jan 02 15:04"
-	}
-
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TIME\tKIND\tSOURCE\tSERVICE\tEVENT")
-	for _, e := range t.Events {
-		service := e.Service
-		if service == "" {
-			service = "-"
+		if _, err := fmt.Fprintln(w, "No events in this window."); err != nil {
+			return err
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			e.Time.In(loc).Format(layout), e.Kind, e.Source, oneLine(service), oneLine(e.Title))
+	} else {
+		layout := "15:04"
+		if !sameDay(from.Add(-t.Lookback), to) {
+			layout = "Jan 02 15:04"
+		}
+
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "TIME\tKIND\tSOURCE\tSERVICE\tEVENT")
+		for _, e := range t.Events {
+			service := e.Service
+			if service == "" {
+				service = "-"
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+				e.Time.In(loc).Format(layout), e.Kind, e.Source, oneLine(service), oneLine(e.Title))
+		}
+		if err := tw.Flush(); err != nil {
+			return err
+		}
 	}
-	return tw.Flush()
+
+	if len(t.ErrorGroups) > 0 {
+		if _, err := fmt.Fprintln(w, "\nERROR GROUPS"); err != nil {
+			return err
+		}
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(tw, "CLASS\tSHARE\tCOUNT\tSERVICE\tSIGNATURE")
+		for _, g := range t.ErrorGroups {
+			service := g.Service
+			if service == "" {
+				service = "-"
+			}
+			fmt.Fprintf(tw, "%s\t%.0f%%\t%d\t%s\t%s\n",
+				oneLine(g.Class), math.Round(g.Share*100), g.Count, oneLine(service), oneLine(g.Signature))
+		}
+		if err := tw.Flush(); err != nil {
+			return err
+		}
+	}
+
+	if t.Verdict != nil {
+		if _, err := fmt.Fprintf(w, "\nVERDICT: %s   confidence: %s\n",
+			oneLine(t.Verdict.Label), oneLine(t.Verdict.Confidence)); err != nil {
+			return err
+		}
+		for _, line := range t.Verdict.Evidence {
+			if _, err := fmt.Fprintf(w, "  - %s\n", oneLine(line)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func sameDay(a, b time.Time) bool {
