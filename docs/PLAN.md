@@ -127,7 +127,7 @@ timeline, and the collector tests run offline.
 **Done when:** 8/8 scenarios produce the expected verdict in CI.
 
 ### M5: Ship v0.1 (in progress, 27 Nov 2026)
-- [ ] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
+- [x] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
 - [x] README with demo GIF and 10-minute quickstart against the lab
 - [ ] Design write-up / blog post: "Was it us? Telling our failures from someone
       else's"
