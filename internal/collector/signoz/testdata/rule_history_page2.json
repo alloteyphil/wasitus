@@ -1,0 +1,26 @@
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "ruleId": "rule-err-rate",
+        "ruleName": "Lab service error rate above 5%",
+        "overallState": "inactive",
+        "overallStateChanged": true,
+        "state": "inactive",
+        "stateChanged": true,
+        "unixMilli": 1795684500000,
+        "labels": [
+          {
+            "key": { "name": "service.name" },
+            "value": "wallet-service"
+          }
+        ],
+        "fingerprint": 1001,
+        "value": 0.4,
+        "relatedTracesLink": "/traces-explorer?startTime=1795684200000&endTime=1795684500000"
+      }
+    ],
+    "total": 4
+  }
+}
