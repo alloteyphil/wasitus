@@ -1,18 +1,22 @@
 # Manual notes: things people did or noticed that no tool records.
 # All data here is fictional and belongs to the demo lab.
 #
-#   time:     RFC 3339, or "YYYY-MM-DD HH:MM" in the config timezone
-#   kind:     change (default) or external
-#   severity: info (default), warning or critical
+#   time:        RFC 3339, or "YYYY-MM-DD HH:MM" in the config timezone
+#   kind:        change (default) or external
+#   change_type: optional (kind: change only): deploy, release, config, infra, merge, docs, test
+#   severity:    info (default), warning or critical
 
 - time: "2026-11-13 18:00"
+  change_type: infra
   title: Rotated the lab TLS certificate
 
 - time: "2026-11-14 02:31"
+  change_type: merge
   service: orders-service
   title: "Merged PR #12: refactor order validation"
 
 - time: "2026-11-14 02:47"
+  change_type: deploy
   service: orders-service
   title: Deployed orders-service v1.4.0 to the lab
 
@@ -23,5 +27,6 @@
   link: https://status.mockpay.test/incidents/42
 
 - time: "2026-11-14 03:20"
+  change_type: infra
   service: wallet-service
   title: Restarted wallet-service

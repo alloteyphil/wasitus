@@ -64,10 +64,13 @@ init_changes() {
   fi
 }
 
-# note SERVICE TITLE: a change, as a person would write it down.
+# note SERVICE TITLE [CHANGE_TYPE]: a change, as a person would write it down.
 note() {
   init_changes
   printf -- '- time: "%s"\n  kind: change\n  service: %s\n  title: "%s"\n' "$(now)" "$1" "$2" >>"$changes"
+  if [[ -n "${3:-}" ]]; then
+    printf -- '  change_type: %s\n' "$3" >>"$changes"
+  fi
 }
 
 hold() {
@@ -85,7 +88,7 @@ reset_lab() {
   if ver=$(orders_env APP_VERSION) && bug=$(orders_env ORDERS_BUG_EVERY); then
     if [[ "$ver" != "$normal_version" || "$bug" != 0 ]]; then
       if deploy "$normal_version" 0; then
-        note orders-service "Rolled back orders-service to v$normal_version"
+        note orders-service "Rolled back orders-service to v$normal_version" deploy
       else
         rc=1
       fi
@@ -134,7 +137,7 @@ say "scenario $id: starting"
 
 case "$id" in
 S1) # Bad deploy: a new orders-service version breaks 20% of orders.
-  note orders-service "Deployed orders-service v1.4.0 (refactor order validation)"
+  note orders-service "Deployed orders-service v1.4.0 (refactor order validation)" deploy
   deploy 1.4.0 5
   hold "$minutes"
   ;;
@@ -161,7 +164,7 @@ S6) # Traffic surge, no fault anywhere.
   ;;
 S7) # Red herring: a harmless deploy, then 5 minutes later the provider
   # suspends the account. The verdict must not blame the deploy.
-  note orders-service "Deployed orders-service v1.3.1 (log wording only)"
+  note orders-service "Deployed orders-service v1.3.1 (log wording only)" deploy
   deploy 1.3.1 0
   hold 5
   start=$(now) # the incident starts now; the deploy is before it

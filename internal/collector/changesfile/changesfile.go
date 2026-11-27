@@ -7,6 +7,7 @@
 //	# changes.yaml: a list of entries
 //	- time: "2026-11-14 02:30"    # RFC 3339, or "YYYY-MM-DD HH:MM" in the config timezone
 //	  kind: change                # change (default) or external
+//	  change_type: deploy         # optional (kind: change only): deploy, release, config, infra, merge, docs, test
 //	  service: orders-service     # optional
 //	  title: Restarted Redis
 //	  severity: info              # info (default), warning or critical
@@ -33,13 +34,16 @@ import (
 // Source is the value of Event.Source for events from this collector.
 const Source = "changes-file"
 
+const attrChangeType = "change_type"
+
 type entry struct {
-	Time     string `yaml:"time"`
-	Kind     string `yaml:"kind"`
-	Service  string `yaml:"service"`
-	Title    string `yaml:"title"`
-	Severity string `yaml:"severity"`
-	Link     string `yaml:"link"`
+	Time       string `yaml:"time"`
+	Kind       string `yaml:"kind"`
+	ChangeType string `yaml:"change_type"`
+	Service    string `yaml:"service"`
+	Title      string `yaml:"title"`
+	Severity   string `yaml:"severity"`
+	Link       string `yaml:"link"`
 }
 
 // Collector reads events from a changes file.
@@ -107,6 +111,14 @@ func (en entry) toEvent(loc *time.Location) (event.Event, error) {
 	if kind != event.KindChange && kind != event.KindExternal {
 		return event.Event{}, fmt.Errorf("kind must be change or external, got %q", en.Kind)
 	}
+	ct := strings.ToLower(strings.TrimSpace(en.ChangeType))
+	if ct != "" && kind != event.KindChange {
+		return event.Event{}, errors.New("change_type is only valid when kind is change")
+	}
+	var attrs map[string]string
+	if ct != "" {
+		attrs = map[string]string{attrChangeType: ct}
+	}
 	return event.Event{
 		ID:       stableID(t, title),
 		Time:     t,
@@ -116,6 +128,7 @@ func (en entry) toEvent(loc *time.Location) (event.Event, error) {
 		Title:    title,
 		Severity: event.Severity(en.Severity), // empty becomes info; unknown values fail validation in the runner
 		Link:     en.Link,
+		Attrs:    attrs,
 	}, nil
 }
 
