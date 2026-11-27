@@ -128,8 +128,7 @@ timeline, and the collector tests run offline.
 
 ### M5: Ship v0.1 (in progress, 27 Nov 2026)
 - [ ] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
-- [ ] README with demo GIF and 10-minute quickstart against the lab
-      (quickstart and Install section landed; GIF next)
+- [x] README with demo GIF and 10-minute quickstart against the lab
 - [ ] Design write-up / blog post: "Was it us? Telling our failures from someone
       else's"
 - [ ] Add the project to the portfolio site (`../portfolio`)

@@ -59,6 +59,8 @@ go build -o wasitus ./cmd/wasitus
 
 ## Try it
 
+![Offline timeline demo](docs/assets/offline-timeline.gif)
+
 ### Offline (no Docker needed)
 
 Run against the bundled example changes file:
