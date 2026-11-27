@@ -28,6 +28,13 @@ services:
     environment:
       MOCKPAY_ADDR: ":8090"
       MOCKPAY_MODE: healthy
+      # HTTPS for wallet-service, so the badcert mode (scenario S5) can serve
+      # an expired certificate. mockpay makes a new lab CA at every start and
+      # shares its certificate (public part only) through the lab-ca volume.
+      MOCKPAY_TLS_ADDR: ":8443"
+      MOCKPAY_TLS_HOSTS: "mockpay,localhost,127.0.0.1"
+      MOCKPAY_CA_OUT: /run/lab-ca/ca.pem
+    volumes: [lab-ca:/run/lab-ca]
     ports: ["127.0.0.1:8090:8090"] # this machine only: /admin/mode has no auth
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/healthz"]
@@ -45,10 +52,15 @@ services:
     environment:
       LAB_ADDR: ":8082"
       APP_VERSION: "1.0.0"
-      MOCKPAY_URL: http://mockpay:8090
+      MOCKPAY_URL: https://mockpay:8443
+      MOCKPAY_CA_FILE: /run/lab-ca/ca.pem # trust mockpay's lab CA
       OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-ingester:4318
+    volumes: [lab-ca:/run/lab-ca:ro]
     depends_on:
-      mockpay: { condition: service_healthy }
+      # restart: a restarted mockpay has a new CA, which wallet-service reads
+      # only at startup; restarting it too avoids "unknown authority" errors
+      # that would look like a different incident.
+      mockpay: { condition: service_healthy, restart: true }
       ingester: { condition: service_started }
       # The migrator is a one-off job. Waiting for it to *complete* also tells
       # `docker compose up --wait` not to expect it to keep running; without
@@ -110,3 +122,30 @@ services:
       retries: 3
     networks: [signoz-network]
     restart: unless-stopped
+
+  # The customers: steady checkouts, so SigNoz has a normal day to compare an
+  # incident with, and alert rules are not judged on a handful of requests.
+  # Not instrumented: customers do not send us telemetry.
+  #   curl -X PUT localhost:8091/admin/rate -d '{"multiplier": 10}'   # S6
+  trafficgen:
+    build:
+      context: .
+      args: { APP: trafficgen }
+    image: wasitus-lab/trafficgen:dev
+    environment:
+      TRAFFIC_TARGET: http://storefront:8080/checkout
+      TRAFFIC_RPS: "2"
+      TRAFFIC_ADMIN_ADDR: ":8091"
+    ports: ["127.0.0.1:8091:8091"] # this machine only: /admin/rate has no auth
+    depends_on:
+      storefront: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8091/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [signoz-network]
+    restart: unless-stopped
+
+volumes:
+  lab-ca: {} # mockpay's lab CA certificate, read by wallet-service
