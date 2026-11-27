@@ -118,3 +118,90 @@ func TestCollect(t *testing.T) {
 		t.Errorf("Collect(missing file) error = %v", err)
 	}
 }
+
+func TestParseChangeType(t *testing.T) {
+	tests := []struct {
+		name      string
+		doc       string
+		wantAttr  string
+		wantNil   bool
+		wantError string
+	}{
+		{
+			name:     "explicit deploy",
+			doc:      "- time: \"2026-11-14 03:00\"\n  change_type: deploy\n  title: Deployed v1.4.0\n",
+			wantAttr: "deploy",
+		},
+		{
+			name:     "trimmed and lowercased",
+			doc:      "- time: \"2026-11-14 03:00\"\n  change_type: \"  Config \"\n  title: Raised timeout\n",
+			wantAttr: "config",
+		},
+		{
+			name:    "omitted leaves attrs nil",
+			doc:     "- time: \"2026-11-14 03:00\"\n  title: Manual note\n",
+			wantNil: true,
+		},
+		{
+			name:    "whitespace only leaves attrs nil",
+			doc:     "- time: \"2026-11-14 03:00\"\n  change_type: \"   \"\n  title: Manual note\n",
+			wantNil: true,
+		},
+		{
+			name:      "rejected on external kind",
+			doc:       "- time: \"2026-11-14 03:00\"\n  kind: external\n  change_type: deploy\n  title: Provider outage\n",
+			wantError: "change_type is only valid when kind is change",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			events, err := parse([]byte(tc.doc), time.UTC)
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("parse() error = %v, want substring %q", err, tc.wantError)
+				}
+				if len(events) != 0 {
+					t.Fatalf("got %d events, want 0", len(events))
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parse() unexpected error: %v", err)
+			}
+			if len(events) != 1 {
+				t.Fatalf("got %d events, want 1", len(events))
+			}
+			if tc.wantNil {
+				if events[0].Attrs != nil {
+					t.Errorf("Attrs = %v, want nil", events[0].Attrs)
+				}
+				return
+			}
+			if got := events[0].Attrs[attrChangeType]; got != tc.wantAttr {
+				t.Errorf("Attrs[%q] = %q, want %q", attrChangeType, got, tc.wantAttr)
+			}
+		})
+	}
+}
+
+func FuzzParse(f *testing.F) {
+	f.Add([]byte(sample))
+	f.Add([]byte(""))
+	f.Add([]byte("# comment only\n"))
+	f.Add([]byte("- time: \"2026-11-14 03:00\"\n  change_type: deploy\n  title: Deploy\n"))
+	f.Add([]byte("- time: \"bad\"\n  kind: external\n  change_type: deploy\n  title: \"\"\n"))
+	f.Add([]byte("not: [valid: yaml"))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		events, _ := parse(data, time.UTC)
+		for _, ev := range events {
+			if ev.ID == "" {
+				t.Fatalf("parsed event has empty ID: %+v", ev)
+			}
+			if ev.Time.Location() != time.UTC {
+				t.Fatalf("parsed event time not UTC: %v", ev.Time)
+			}
+		}
+	})
+}
