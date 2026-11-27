@@ -25,6 +25,27 @@ Only the UI (8080) and OTLP (4317, 4318) are published, and only on
 127.0.0.1, so they are reachable from your machine alone. ClickHouse and
 Postgres are reachable only inside Docker's network.
 
+## What `make lab-up` sets up in SigNoz
+
+`setup.sh` runs after the containers are healthy. Every step is skipped when
+it is already done, so running it again changes nothing.
+
+1. **The first admin account.** A fresh SigNoz ingests nothing until one
+   exists. The login is generated into `demo/.env` (`LAB_SIGNOZ_EMAIL`,
+   `LAB_SIGNOZ_PASSWORD`).
+2. **Alert rules**, one file each in `alerts/` (milestone M1): a lab service's
+   error rate above 5% over 5 minutes, and storefront's checkout p99 above 3s.
+   Rules are matched by name, so a rule edited in SigNoz's UI is not
+   overwritten. Expect a rule to fire 2 to 4 minutes after a failure starts:
+   SigNoz evaluates data with a 2-minute delay (docs/adr/0007-signoz-api.md).
+3. **A read-only API key for wasitus**: a service account `wasitus-reader`
+   with SigNoz's viewer role, its key saved as `SIGNOZ_API_KEY` in
+   `demo/.env`, valid for 90 days. SigNoz refuses any change made with it,
+   but it can read all telemetry in this SigNoz (a viewer key can even run raw
+   ClickHouse queries), so treat it like any other credential.
+
+All three are made with the API calls recorded in ADR-0007.
+
 ## Upgrading
 
 1. Pick a SigNoz release at least two weeks old and the signoz-otel-collector
