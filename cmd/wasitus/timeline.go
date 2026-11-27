@@ -88,7 +88,7 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 	res := collector.Run(ctx, win.WithLookback(cfg.Lookback), collectors)
 
 	var analysis analysisResult
-	if sz != nil {
+	if sz != nil && !hasFatalSigNozFailure(res.Failures) && ctx.Err() == nil {
 		analysis = analyzeIncident(ctx, sz, cfg, userRules, win, res.Events)
 	}
 
@@ -127,15 +127,26 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 		return exitError
 	}
 	for _, w := range warnings {
-		fmt.Fprintf(stderr, "warning: %s\n", w)
+		fmt.Fprintf(stderr, "warning: %s\n", redactor.String(w))
 	}
 	for _, f := range failures {
-		fmt.Fprintf(stderr, "warning: %v\n", f)
+		fmt.Fprintf(stderr, "warning: %s\n", redactor.String(f.Error()))
 	}
 	if len(failures) > 0 {
 		return exitPartial
 	}
 	return exitOK
+}
+
+// hasFatalSigNozFailure reports whether the SigNoz collector already failed
+// with an auth error, so analyzeIncident does not repeat doomed requests.
+func hasFatalSigNozFailure(failures []collector.Failure) bool {
+	for _, f := range failures {
+		if f.Collector == signoz.Source && (errors.Is(f.Err, signoz.ErrUnauthorized) || errors.Is(f.Err, signoz.ErrForbidden)) {
+			return true
+		}
+	}
+	return false
 }
 
 // warningReporter is implemented by collectors that record non-fatal warnings

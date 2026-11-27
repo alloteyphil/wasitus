@@ -252,7 +252,11 @@ func startScenarioSigNozServer(t *testing.T, sc scenarioFixture, winFrom, winTo 
 				return
 			}
 			if req.RequestType == "time_series" {
-				writeTrafficResponse(w, req.Start, req.End, req.CompositeQuery.Queries[0].Spec.StepInterval, sc.Traffic, winFrom, winTo)
+				var stepSec int64
+				if len(req.CompositeQuery.Queries) > 0 {
+					stepSec = req.CompositeQuery.Queries[0].Spec.StepInterval
+				}
+				writeTrafficResponse(w, req.Start, req.End, stepSec, sc.Traffic, winFrom, winTo)
 				return
 			}
 			signal := ""
@@ -557,5 +561,140 @@ func TestTimelineFormatsRedactionAndUserRules(t *testing.T) {
 	}
 	if !strings.Contains(out, `"EXTERNAL / account"`) || !strings.Contains(out, `"custom-billing-code"`) {
 		t.Errorf("custom rules output did not apply custom rule:\n%s", out)
+	}
+}
+
+func TestExternalEventDoesNotPoisonInternalHosts(t *testing.T) {
+	sc := scenarioFixture{
+		ID:            "ext-host",
+		Name:          "External event naming mockpay",
+		WindowFrom:    "2026-11-26T09:00:00Z",
+		WindowTo:      "2026-11-26T09:15:00Z",
+		ExpectedSide:  "EXTERNAL",
+		ExpectedCause: "dependency",
+		ExpectedLabel: "EXTERNAL / dependency",
+		ChangesYAML:   "- time: \"2026-11-26T09:01:00Z\"\n  kind: external\n  service: mockpay\n  title: \"mockpay status page: degraded\"\n",
+		ErrorSpans: []scenarioSpanBatch{{
+			Count:         8,
+			Start:         "2026-11-26T09:01:00Z",
+			StepSeconds:   30,
+			Service:       "wallet-service",
+			Kind:          "Client",
+			ServerAddress: "mockpay",
+			HTTPStatus:    "503",
+			Message:       "mockpay rejected the charge: HTTP 503 ServiceUnavailable",
+		}},
+	}
+	runScenarioCheck(t, sc)
+}
+
+func TestUnalignedTrafficWindowDetectsSpike(t *testing.T) {
+	winFrom := time.Date(2026, 11, 26, 9, 0, 0, 0, time.UTC)
+	winTo := time.Date(2026, 11, 26, 9, 15, 0, 0, time.UTC)
+	sc := scenarioFixture{
+		ID:         "S6-unaligned",
+		WindowFrom: "2026-11-26T09:02:13Z",
+		WindowTo:   "2026-11-26T09:17:42Z",
+		Traffic: map[string]scenarioTraffic{
+			"storefront": {BaselineReq: 600, BaselineErr: 0, WindowReq: 6000, WindowErr: 0},
+		},
+	}
+	szSrv := startScenarioSigNozServer(t, sc, winFrom, winTo)
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "wasitus.yaml")
+	write(t, cfgPath, fmt.Sprintf("timezone: UTC\nsources:\n  signoz:\n    url: %s\n", szSrv.URL))
+
+	code, out, errOut := runCLI("timeline",
+		"--config", cfgPath,
+		"--from", sc.WindowFrom,
+		"--to", sc.WindowTo,
+		"--format", "json",
+	)
+	if code != exitOK || errOut != "" {
+		t.Fatalf("unaligned traffic: exit %d, stderr %q", code, errOut)
+	}
+	if !strings.Contains(out, `"EXTERNAL / traffic"`) {
+		t.Errorf("unaligned window missed traffic spike:\n%s", out)
+	}
+}
+
+func TestAnalyzeIncidentPartialFailureAndStderrRedaction(t *testing.T) {
+	const rawEmail = "bob@example.com"
+	spans := expandSpanBatches("p", []scenarioSpanBatch{{
+		Count:         5,
+		Start:         "2026-11-26T09:01:00Z",
+		StepSeconds:   30,
+		Service:       "wallet-service",
+		Kind:          "Client",
+		ServerAddress: "mockpay",
+		HTTPStatus:    "402",
+		Message:       "mockpay rejected the charge: HTTP 402 AccountSuspended",
+	}})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/version":
+			fmt.Fprint(w, `{"version":"v0.149.0","setupCompleted":true}`)
+		case "/api/v3/rules":
+			fmt.Fprint(w, `{"status":"success","data":{"rules":[],"total":0}}`)
+		case "/api/v5/query_range":
+			var req struct {
+				Start          int64  `json:"start"`
+				End            int64  `json:"end"`
+				RequestType    string `json:"requestType"`
+				CompositeQuery struct {
+					Queries []struct {
+						Spec struct {
+							Signal string `json:"signal"`
+						} `json:"spec"`
+					} `json:"queries"`
+				} `json:"compositeQuery"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			if req.RequestType == "time_series" {
+				http.Error(w, `{"error":{"message":"query failed for `+rawEmail+`"}}`, http.StatusInternalServerError)
+				return
+			}
+			if len(req.CompositeQuery.Queries) > 0 && req.CompositeQuery.Queries[0].Spec.Signal == "logs" {
+				fmt.Fprint(w, `{"status":"success","data":{"type":"raw","data":{"results":[{"queryName":"A","rows":[]}]}}}`)
+				return
+			}
+			writeErrorSpansResponse(w, req.Start, req.End, spans)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "wasitus.yaml")
+	write(t, cfgPath, fmt.Sprintf("timezone: UTC\nsources:\n  signoz:\n    url: %s\n", srv.URL))
+
+	// Default: traffic fails -> exitPartial, verdict still rendered, stderr redacted.
+	code, out, errOut := runCLI("timeline",
+		"--config", cfgPath,
+		"--from", "2026-11-26T09:00:00Z",
+		"--to", "2026-11-26T09:15:00Z",
+		"--format", "json",
+	)
+	if code != exitPartial {
+		t.Fatalf("partial analysis exit = %d, want %d (stderr: %q)", code, exitPartial, errOut)
+	}
+	if !strings.Contains(out, `"EXTERNAL / account"`) {
+		t.Errorf("partial analysis should still render verdict:\n%s", out)
+	}
+	if strings.Contains(errOut, rawEmail) || !strings.Contains(errOut, "[email]") {
+		t.Errorf("stderr should redact email by default, got: %q", errOut)
+	}
+
+	// --no-redact: raw email preserved on stderr.
+	code, _, errOut = runCLI("timeline",
+		"--config", cfgPath,
+		"--from", "2026-11-26T09:00:00Z",
+		"--to", "2026-11-26T09:15:00Z",
+		"--no-redact",
+	)
+	if code != exitPartial || !strings.Contains(errOut, rawEmail) {
+		t.Errorf("--no-redact stderr = %q (exit %d), want raw email", errOut, code)
 	}
 }
