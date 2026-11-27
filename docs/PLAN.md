@@ -71,7 +71,7 @@ Time is in weekends (roughly 8–10 focused hours each). Estimates, not promises
       makes the first slice real instead of fake)
 - [x] Conventional commits, CHANGELOG.md, GitHub milestones M0–M5
 - [x] CI green on the first pull request
-- [ ] CI/CD (added 26 Nov, to learn GitHub Actions; see docs/CI_CD.md): tests on
+- [x] CI/CD (added 26 Nov, to learn GitHub Actions; see docs/CI_CD.md): tests on
       Linux, macOS and Windows, workflow lint, release dry run on every PR,
       release workflow on `v*` tags (moved up from M5), Dependabot
 
@@ -86,40 +86,42 @@ example changes file.
       (healthy, outage, slow, suspended, rate-limited, expired cert); in Docker,
       wallet-service calls it over HTTPS so the expired cert really bites
 - [x] Traffic generator (runs in the lab at 2 checkouts/s; rate changeable)
-- [ ] `demo/scenarios/*.sh` to stage and reset each scenario
+- [x] `demo/scenarios/run.sh` (`make scenario ID=S1..S8`, `make scenario-reset`)
+      to stage and reset each scenario
 - [x] Alert rules in SigNoz for error rate and latency (`demo/signoz/alerts/`,
       created by `make lab-up`)
 
-**Done when:** `make lab-up && make scenario S2` produces a visible incident in the
-local SigNoz.
+**Done when:** `make lab-up && make scenario ID=S2` produces a visible incident in
+the local SigNoz.
 
 ### M2: The timeline (weekend 3)
 - [x] Spike: confirm which SigNoz API endpoints give alert history and query
       traces/logs (record findings in an ADR): docs/adr/0007-signoz-api.md
-- [ ] Collectors: SigNoz alerts, GitHub (PRs, deployments, releases)
-- [ ] Record/replay test harness: real API responses saved to `testdata/`, replayed
+- [x] Collectors: SigNoz alerts, GitHub (PRs, deployments, releases)
+- [x] Record/replay test harness: API responses saved to `testdata/`, replayed
       through `httptest` servers in CI
-- [ ] Merge, sort, de-duplicate; terminal table output
+- [x] Merge, sort, de-duplicate; terminal table output
 
 **Done when:** running against the lab shows the deploy and the alert in one
 timeline, and the collector tests run offline.
 
 ### M3: Error fingerprinting (weekends 4–5)
-- [ ] SigNoz collector for error spans and logs (status, HTTP code, server address,
+- [x] SigNoz collector for error spans and logs (status, HTTP code, server address,
       exception type and message)
-- [ ] Rules engine: data-driven rules file (built-in defaults, user-overridable)
-- [ ] Classify errors into causes, with share-of-errors per cause
-- [ ] Spike detection: 5-minute buckets compared with a 7-day baseline
-- [ ] PII redaction
+- [x] Rules engine: data-driven rules file (built-in defaults, user-overridable
+      via `rules_file`)
+- [x] Classify errors into causes, with share-of-errors per cause
+- [x] Spike detection: 5-minute buckets compared with a 7-day baseline
+- [x] PII redaction
 
 **Done when:** each lab scenario's errors land in the expected cause class.
 
 ### M4: Correlation and verdict (weekend 6)
-- [ ] Candidate-cause scoring for changes (time proximity, same service, change type)
-- [ ] Verdict engine combining change candidates and fingerprint evidence
-- [ ] `UNKNOWN` when evidence is weak; confidence levels
-- [ ] Markdown and JSON output; golden-file tests
-- [ ] Scenario test suite: all scenarios in SCENARIOS.md pass from recorded fixtures
+- [x] Candidate-cause scoring for changes (time proximity, same service, change type)
+- [x] Verdict engine combining change candidates and fingerprint evidence
+- [x] `UNKNOWN` when evidence is weak; confidence levels
+- [x] Markdown and JSON output; golden-file tests
+- [x] Scenario test suite: all scenarios in SCENARIOS.md pass from recorded fixtures
 
 **Done when:** 8/8 scenarios produce the expected verdict in CI.
 

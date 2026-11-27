@@ -34,11 +34,21 @@ all services ──► OpenTelemetry ──► SigNoz (local)
 S7 and S8 are the important ones. S7 proves the tool does not just blame the most
 recent deploy. S8 proves it admits when it does not know.
 
-## Recording a scenario
+## Running and staging scenarios
+
+Run the offline scenario suite (replays `testdata/scenarios/S1`–`S8` through
+`httptest`, as CI does):
+
+```
+go test ./... -run TestScenario
+go test ./... -run Scenario/S3
+```
+
+Stage a live incident in the local demo lab and run `wasitus` against it:
 
 ```
 make lab-up
-make scenario ID=S3          # stages the fault, waits for alerts, resets
-make record ID=S3            # captures SigNoz + GitHub responses into testdata/
-go test ./... -run Scenario/S3
+make scenario ID=S3                  # stages the fault, waits, and resets
+set -a && source demo/.env && set +a
+go run ./cmd/wasitus timeline --config demo/wasitus.lab.yaml --from -15m --to now
 ```
