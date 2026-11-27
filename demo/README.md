@@ -131,6 +131,11 @@ default `60`), and for HTTPS `MOCKPAY_TLS_ADDR` (default `:8443`),
 `MOCKPAY_CA_OUT` (where to write the lab CA certificate). mockpay creates a
 new lab CA at every start; in Docker it shares the certificate (public part
 only) with wallet-service through the `lab-ca` volume, and wallet-service
-calls `https://mockpay:8443`. Private keys never leave mockpay's memory. Switching mode resets the rate-limit window and the outage
+calls `https://mockpay:8443`. Private keys never leave mockpay's memory.
+Compose restarts wallet-service whenever it restarts mockpay, so the new CA is
+picked up; after a mockpay crash or a plain `docker restart`, run
+`docker compose -f demo/compose.yaml restart wallet-service`.
+
+Switching mode resets the rate-limit window and the outage
 counter, so every staged scenario starts from the same state. `/healthz`
 answers `ok` in every mode, so Docker never restarts mockpay mid-scenario.
