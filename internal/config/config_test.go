@@ -21,6 +21,7 @@ sources:
     repos: [alloteyphil/wasitus]
 services:
   alloteyphil/wasitus: orders-service
+rules_file: rules/custom.yaml
 `
 
 func TestParseFullConfig(t *testing.T) {
@@ -36,6 +37,9 @@ func TestParseFullConfig(t *testing.T) {
 	}
 	if got, want := c.ChangesFilePath(), filepath.Join("/etc/wasitus", "notes/changes.yaml"); got != want {
 		t.Errorf("ChangesFilePath() = %q, want %q", got, want)
+	}
+	if got, want := c.RulesFilePath(), filepath.Join("/etc/wasitus", "rules/custom.yaml"); got != want {
+		t.Errorf("RulesFilePath() = %q, want %q", got, want)
 	}
 	if c.Sources.SigNoz == nil || c.Sources.SigNoz.URL != "http://localhost:8080" {
 		t.Errorf("Sources.SigNoz = %+v", c.Sources.SigNoz)
@@ -67,6 +71,17 @@ func TestParseDefaults(t *testing.T) {
 	}
 	if got := c.ChangesFilePath(); got != abs {
 		t.Errorf("ChangesFilePath() = %q, absolute path should be kept", got)
+	}
+	if got := c.RulesFilePath(); got != "" {
+		t.Errorf("RulesFilePath() = %q, want empty when unset", got)
+	}
+	absRules := filepath.Join(t.TempDir(), "rules.yaml")
+	c2, err := Parse([]byte("sources:\n  changes_file: '"+abs+"'\nrules_file: '"+absRules+"'\n"), "/ignored")
+	if err != nil {
+		t.Fatalf("Parse(abs rules_file) error = %v", err)
+	}
+	if got := c2.RulesFilePath(); got != absRules {
+		t.Errorf("RulesFilePath() = %q, absolute path should be kept", got)
 	}
 }
 

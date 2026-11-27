@@ -153,6 +153,10 @@ func (c *Config) Location() *time.Location { return c.location }
 // directory, or "" if no changes file is configured.
 func (c *Config) ChangesFilePath() string { return c.resolve(c.Sources.ChangesFile) }
 
+// RulesFilePath is the optional user fingerprint rules file path resolved
+// against the config file's directory, or "" if not configured.
+func (c *Config) RulesFilePath() string { return c.resolve(c.RulesFile) }
+
 // ServiceFor returns the telemetry service name mapped to a repository, or "".
 func (c *Config) ServiceFor(repo string) string { return c.Services[repo] }
 

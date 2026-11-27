@@ -25,7 +25,7 @@ const (
 const usage = `wasitus: was it us? Incident timelines and verdicts.
 
 Usage:
-  wasitus timeline --from TIME [--to TIME] [--config FILE] [--timeout DURATION]
+  wasitus timeline --from TIME [--to TIME] [--config FILE] [--timeout DURATION] [--format table|markdown|json] [--no-redact]
   wasitus version
 
 TIME is "now", an offset into the past such as "-2h", an RFC 3339 timestamp,

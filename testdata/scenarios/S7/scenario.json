@@ -1,0 +1,51 @@
+{
+  "id": "S7",
+  "name": "Red herring",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "account",
+  "expected_label": "EXTERNAL / account",
+  "expected_evidence_substrings": [
+    "classified as account",
+    "was not blamed"
+  ],
+  "changes_yaml": "- time: \"2026-11-26T08:55:00Z\"\n  kind: change\n  service: orders-service\n  title: \"Deploy orders-service v1.4.1 (harmless deploy)\"\n",
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "orders-service",
+      "fired_at": "2026-11-26T09:02:00Z",
+      "value": 99.0
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "402",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 5,
+      "start": "2026-11-26T09:00:12Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "*fmt.wrapError",
+      "message": "payment for ord_000123 failed: HTTP 502 PaymentProviderError: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue."
+    }
+  ],
+  "traffic": {
+    "orders-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 594 },
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 594 }
+  }
+}

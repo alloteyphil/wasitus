@@ -1,0 +1,39 @@
+{
+  "id": "S2",
+  "name": "Provider outage",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "dependency",
+  "expected_label": "EXTERNAL / dependency",
+  "expected_evidence_substrings": [
+    "classified as dependency",
+    "mockpay"
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "wallet-service",
+      "fired_at": "2026-11-26T09:02:00Z",
+      "value": 98.0
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 12,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "503",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 503 ServiceUnavailable: Payments are temporarily unavailable. Try again later."
+    }
+  ],
+  "traffic": {
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 595, "window_err": 590 }
+  }
+}

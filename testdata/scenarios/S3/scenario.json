@@ -1,0 +1,39 @@
+{
+  "id": "S3",
+  "name": "Suspended account",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "account",
+  "expected_label": "EXTERNAL / account",
+  "expected_evidence_substrings": [
+    "classified as account",
+    "AccountSuspended"
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "wallet-service",
+      "fired_at": "2026-11-26T09:02:00Z",
+      "value": 100.0
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 15,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 20,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "402",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    }
+  ],
+  "traffic": {
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 600 }
+  }
+}
