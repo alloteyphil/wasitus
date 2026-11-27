@@ -8,7 +8,12 @@ lookback: 60m            # also collect this long before --from
 sources:
   changes_file: changes.yaml   # manual notes; relative to this file
 
-  # Coming in M2:
+  # SigNoz (tested against v0.149.0): alert history and error-span summaries.
+  # Use a read-only service-account API key (signoz-viewer role), stored in
+  # the environment variable named below. If api_key_env is set and missing or
+  # empty, wasitus stops with an error instead of sending unauthenticated calls.
+  # Note: in SigNoz v0.149.0 a viewer key can read all telemetry in that
+  # instance (see docs/adr/0007-signoz-api.md).
   # signoz:
   #   url: http://localhost:8080
   #   api_key_env: SIGNOZ_API_KEY

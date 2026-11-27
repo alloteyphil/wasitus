@@ -13,6 +13,7 @@ import (
 	"github.com/alloteyphil/wasitus/internal/collector"
 	"github.com/alloteyphil/wasitus/internal/collector/changesfile"
 	"github.com/alloteyphil/wasitus/internal/collector/github"
+	"github.com/alloteyphil/wasitus/internal/collector/signoz"
 	"github.com/alloteyphil/wasitus/internal/config"
 	"github.com/alloteyphil/wasitus/internal/event"
 	"github.com/alloteyphil/wasitus/internal/render"
@@ -62,16 +63,9 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 		return exitUsage
 	}
 
-	collectors, notes, err := buildCollectors(cfg, os.LookupEnv)
+	collectors, err := buildCollectors(cfg, os.LookupEnv)
 	if err != nil {
 		fmt.Fprintf(stderr, "wasitus: %v\n", err)
-		return exitError
-	}
-	for _, n := range notes {
-		fmt.Fprintf(stderr, "note: %s\n", n)
-	}
-	if len(collectors) == 0 {
-		fmt.Fprintln(stderr, "wasitus: none of the configured sources is supported yet")
 		return exitError
 	}
 
@@ -89,6 +83,13 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 		fmt.Fprintf(stderr, "wasitus: write output: %v\n", err)
 		return exitError
 	}
+	for _, c := range collectors {
+		if wr, ok := c.(warningReporter); ok {
+			for _, w := range wr.Warnings() {
+				fmt.Fprintf(stderr, "warning: %s: %s\n", c.Name(), w)
+			}
+		}
+	}
 	for _, f := range res.Failures {
 		fmt.Fprintf(stderr, "warning: %v\n", f)
 	}
@@ -98,30 +99,57 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 	return exitOK
 }
 
+// warningReporter is implemented by collectors that record non-fatal warnings
+// (for example, an untested SigNoz server version or a query warning).
+type warningReporter interface {
+	Warnings() []string
+}
+
 // githubAPI is the GitHub REST API root. Tests point it at a local server.
 var githubAPI = github.DefaultBaseURL
 
-// githubRequestTimeout bounds each GitHub request; --timeout bounds the run.
-const githubRequestTimeout = 30 * time.Second
+// httpRequestTimeout bounds each individual API request; --timeout bounds the run.
+const httpRequestTimeout = 30 * time.Second
 
-// buildCollectors creates a collector for each configured source that is
-// implemented, and a note for each one that is not implemented yet. Secrets
-// are read with lookupEnv (normally os.LookupEnv).
-func buildCollectors(cfg *config.Config, lookupEnv func(string) (string, bool)) (cs []collector.Collector, notes []string, err error) {
+// buildCollectors creates a collector for each configured source. Secrets are
+// read with lookupEnv (normally os.LookupEnv).
+func buildCollectors(cfg *config.Config, lookupEnv func(string) (string, bool)) (cs []collector.Collector, err error) {
 	if p := cfg.ChangesFilePath(); p != "" {
 		cs = append(cs, changesfile.New(p, cfg.Location()))
 	}
-	if cfg.Sources.SigNoz != nil {
-		notes = append(notes, "sources.signoz is configured but not supported yet (planned for M2); skipping")
+	if sz := cfg.Sources.SigNoz; sz != nil {
+		c, err := newSigNozCollector(sz, lookupEnv)
+		if err != nil {
+			return nil, err
+		}
+		cs = append(cs, c)
 	}
 	if gh := cfg.Sources.GitHub; gh != nil {
 		c, err := newGitHubCollector(gh, cfg.ServiceFor, lookupEnv)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		cs = append(cs, c)
 	}
-	return cs, notes, nil
+	if len(cs) == 0 {
+		return nil, errors.New("no collectors configured for the enabled sources")
+	}
+	return cs, nil
+}
+
+// newSigNozCollector reads the API key from the environment variable named in
+// the config. When api_key_env is set, a missing or empty variable is an error
+// so a typo never silently sends unauthenticated requests.
+func newSigNozCollector(sz *config.SigNoz, lookupEnv func(string) (string, bool)) (*signoz.Collector, error) {
+	var apiKey string
+	if sz.APIKeyEnv != "" {
+		k, err := config.Secret(sz.APIKeyEnv, lookupEnv)
+		if err != nil {
+			return nil, fmt.Errorf("sources.signoz: %w; it must hold a read-only SigNoz API key", err)
+		}
+		apiKey = k
+	}
+	return signoz.New(sz.URL, apiKey, &http.Client{Timeout: httpRequestTimeout})
 }
 
 // newGitHubCollector reads the token from the environment variable named in
@@ -136,5 +164,5 @@ func newGitHubCollector(gh *config.GitHub, serviceFor func(string) string, looku
 		}
 		token = t
 	}
-	return github.New(gh.Repos, token, githubAPI, &http.Client{Timeout: githubRequestTimeout}, serviceFor)
+	return github.New(gh.Repos, token, githubAPI, &http.Client{Timeout: httpRequestTimeout}, serviceFor)
 }

@@ -1,0 +1,61 @@
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "ruleId": "rule-err-rate",
+        "ruleName": "Lab service error rate above 5%",
+        "overallState": "pending",
+        "overallStateChanged": true,
+        "state": "pending",
+        "stateChanged": true,
+        "unixMilli": 1795683660000,
+        "labels": [
+          {
+            "key": { "name": "service.name" },
+            "value": "wallet-service"
+          }
+        ],
+        "fingerprint": 1001,
+        "value": 18.2
+      },
+      {
+        "ruleId": "rule-err-rate",
+        "ruleName": "Lab service error rate above 5%",
+        "overallState": "firing",
+        "overallStateChanged": true,
+        "state": "firing",
+        "stateChanged": true,
+        "unixMilli": 1795683780000,
+        "labels": [
+          {
+            "key": { "name": "service.name" },
+            "value": "wallet-service"
+          }
+        ],
+        "fingerprint": 1001,
+        "value": 31.4,
+        "relatedTracesLink": "/traces-explorer?startTime=1795683480000&endTime=1795683780000"
+      },
+      {
+        "ruleId": "rule-err-rate",
+        "ruleName": "Lab service error rate above 5%",
+        "overallState": "firing",
+        "overallStateChanged": false,
+        "state": "firing",
+        "stateChanged": false,
+        "unixMilli": 1795683840000,
+        "labels": [
+          {
+            "key": { "name": "service.name" },
+            "value": "wallet-service"
+          }
+        ],
+        "fingerprint": 1001,
+        "value": 34.0
+      }
+    ],
+    "total": 4,
+    "nextCursor": "page-2-cursor"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "status": "success",
+  "data": {
+    "type": "raw",
+    "data": {
+      "results": [
+        {
+          "queryName": "A",
+          "nextCursor": "",
+          "rows": [
+            {
+              "timestamp": "2026-11-26T09:01:10.500Z",
+              "data": {
+                "trace_id": "aaaa0000000000000000000000000001",
+                "span_id": "span-wallet-client-1",
+                "name": "POST /v1/charges",
+                "kind_string": "Client",
+                "response_status_code": "402",
+                "status_message": "",
+                "resource": {
+                  "service.name": "wallet-service",
+                  "service.version": "1.0.0",
+                  "deployment.environment.name": "lab"
+                },
+                "attributes": {
+                  "http.request.method": "POST",
+                  "http.response.status_code": 402,
+                  "server.address": "mockpay",
+                  "server.port": 8443
+                },
+                "events": []
+              }
+            },
+            {
+              "timestamp": "2026-11-26T09:01:10.520Z",
+              "data": {
+                "trace_id": "aaaa0000000000000000000000000001",
+                "span_id": "span-wallet-server-1",
+                "name": "POST /payments",
+                "kind_string": "Server",
+                "response_status_code": "502",
+                "status_message": "",
+                "resource": {
+                  "service.name": "wallet-service",
+                  "service.version": "1.0.0"
+                },
+                "attributes": {
+                  "payment.provider": "mockpay",
+                  "payment.provider.error_code": "AccountSuspended",
+                  "http.response.status_code": 502
+                },
+                "events": [
+                  {
+                    "name": "exception",
+                    "timeUnixNano": 1795683670520000000,
+                    "attributes": {
+                      "exception.type": "*fmt.wrapError",
+                      "exception.message": "mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue."
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "timestamp": "2026-11-26T09:02:05.100Z",
+              "data": {
+                "trace_id": "bbbb0000000000000000000000000002",
+                "span_id": "span-orders-panic-1",
+                "name": "POST /orders",
+                "kind_string": "Server",
+                "response_status_code": "500",
+                "status_message": "",
+                "resource": {
+                  "service.name": "orders-service",
+                  "service.version": "1.4.0"
+                },
+                "attributes": {
+                  "http.response.status_code": 500
+                },
+                "events": [
+                  {
+                    "name": "exception",
+                    "timeUnixNano": 1795683725100000000,
+                    "attributes": {
+                      "exception.type": "runtime.boundsError",
+                      "exception.message": "runtime error: index out of range [3] with length 3"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
