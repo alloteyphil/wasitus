@@ -78,7 +78,7 @@ lab-smoke:
 
 # Stage one incident from docs/SCENARIOS.md (e.g. make scenario ID=S2 [MINUTES=6]).
 scenario:
-	demo/scenarios/run.sh "$(ID)" $(MINUTES)
+	demo/scenarios/run.sh "$(ID)" "$(MINUTES)"
 
 # Put the running lab back to normal (mockpay healthy, traffic x1, orders-service v1.3.0).
 scenario-reset:
