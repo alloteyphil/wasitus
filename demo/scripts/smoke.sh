@@ -25,7 +25,20 @@ fail() {
   exit 1
 }
 
-trap 'set_mode healthy || true' EXIT
+# Pause the background customers (trafficgen) so the counts below are this
+# test's own requests, not traffic that would pass the checks on its own.
+compose=(docker compose -f "$(dirname "$0")/../compose.yaml")
+paused_traffic=false
+if [[ -n "$("${compose[@]}" ps -q --status running trafficgen 2>/dev/null)" ]]; then
+  "${compose[@]}" stop trafficgen >/dev/null 2>&1
+  paused_traffic=true
+  sleep 2 # let in-flight requests finish before the window starts
+fi
+restore() {
+  set_mode healthy || true
+  if [[ "$paused_traffic" == true ]]; then "${compose[@]}" start trafficgen >/dev/null 2>&1 || true; fi
+}
+trap restore EXIT
 start=$(date -u +%s)
 
 for i in 1 2 3 4 5; do
