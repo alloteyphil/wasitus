@@ -16,8 +16,9 @@ It is read-only, runs on your own machine, and sends your data nowhere.
 > file, then fingerprints errors, checks for traffic spikes, correlates recent
 > changes, and produces a deterministic verdict in table, Markdown, or JSON
 > format with PII redaction on by default. All 8/8 synthetic staged scenarios in
-> [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. Roadmap after v0.1:
-> [docs/PLAN.md](docs/PLAN.md) §5b.
+> [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. Roadmap after v0.1 (more
+> backends for reach — Prometheus, Loki/OTLP, Datadog):
+> [docs/PLAN.md](docs/PLAN.md) §5b · [ADR-0008](docs/adr/0008-multi-backend-observability.md).
 
 ## Install
 
@@ -170,7 +171,7 @@ the data. See [docs/PRIOR_ART.md](docs/PRIOR_ART.md).
 | [docs/SCENARIOS.md](docs/SCENARIOS.md) | Staged incidents and the verdict each must produce |
 | [docs/writeups/was-it-us.md](docs/writeups/was-it-us.md) | Design write-up: was it us vs someone else |
 | [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | Existing tools and how this one differs |
-| [docs/adr/](docs/adr/) | Architecture decision records |
+| [docs/adr/](docs/adr/) | Architecture decision records (incl. multi-backend ADR-0008) |
 
 ## License
 
