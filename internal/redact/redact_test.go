@@ -38,6 +38,9 @@ var redactCases = []redactCase{
 	{"email with tag and brackets", "<a.b+tag@orders.lab.example>", "<[email]>"},
 	{"email in a query", "/v1/users?email=ama.mensah@mockpay.example&page=2", "/v1/users?email=[email]&page=2"},
 	{"email before a colon and a space", "contact orders-ops@lab.example: thanks", "contact [email]: thanks"},
+	// Only user@host:path is a remote; these are still addresses (review of #14).
+	{"email glued to a colon and a word", "login failed for alice@lab.example:" + sample, "login failed for [email]:" + sample},
+	{"email glued to a port", "to:bob@lab.example:443", "to:[email]:443"},
 	// The host:port exception must not let ordinary digit secrets through.
 	{"digits secret after a blank", "db.password: 123456", "db.password: [token]"},
 	{"digits secret after =", "password=123456", "password=[token]"},
