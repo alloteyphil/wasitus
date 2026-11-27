@@ -1,0 +1,32 @@
+{
+  "status": "success",
+  "data": {
+    "rules": [
+      {
+        "id": "rule-err-rate",
+        "alert": "Lab service error rate above 5%",
+        "state": "inactive",
+        "alertType": "TRACES_BASED_ALERT",
+        "ruleType": "threshold_rule",
+        "disabled": false,
+        "labels": {
+          "severity": "critical",
+          "source": "wasitus-lab"
+        }
+      },
+      {
+        "id": "rule-p99-latency",
+        "alert": "Storefront checkout latency p99 above 3s",
+        "state": "inactive",
+        "alertType": "TRACES_BASED_ALERT",
+        "ruleType": "threshold_rule",
+        "disabled": false,
+        "labels": {
+          "severity": "warning",
+          "source": "wasitus-lab"
+        }
+      }
+    ],
+    "total": 2
+  }
+}
