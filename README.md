@@ -49,7 +49,8 @@ go test -v ./cmd/wasitus -run TestScenario
 
 ### 10-minute quickstart against the demo lab
 
-Requires Docker with at least 4 GiB RAM allocated (see [demo/README.md](demo/README.md)):
+Requires Docker with about 6 GB of memory for containers (see
+[demo/README.md](demo/README.md)):
 
 ```
 make lab-up                                    # starts SigNoz, lab services, and mockpay
@@ -89,10 +90,10 @@ ClickHouse SQL queries, so it can read all telemetry in that SigNoz instance
 
 ## Example verdict output
 
-Real table output from `wasitus` on a red-herring incident (S7): a deploy went
-out right before the outage, yet 93% of errors are `AccountSuspended` responses
-from `mockpay`, so `wasitus` points to `EXTERNAL / account` and explains why
-the deploy was not blamed:
+Real table output from `wasitus` on an S7-style red-herring incident: a deploy
+went out right before the outage, yet 93% of errors are `AccountSuspended`
+responses from `mockpay`, so `wasitus` points to `EXTERNAL / account` and
+explains why the deploy was not blamed:
 
 ```
 Window: 2026-11-14 03:00 -> 2026-11-14 04:00 UTC (plus 60m lookback)
