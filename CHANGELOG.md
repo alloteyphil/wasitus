@@ -28,3 +28,7 @@ All notable changes to this project are documented here. The format follows
 - Demo lab: `storefront`, `orders-service` and `wallet-service`, traced with
   OpenTelemetry end to end, with a staged code bug in orders-service for the
   bad-deploy scenario (S1).
+- Demo lab with Docker: `make lab-up` starts a pinned SigNoz and the lab
+  services and completes SigNoz's first-run setup; `make lab-smoke` checks
+  that checkouts work and their traces reach SigNoz (also run in CI when the
+  lab changes, and weekly).

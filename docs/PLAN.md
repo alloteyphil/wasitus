@@ -79,8 +79,9 @@ Time is in weekends (roughly 8–10 focused hours each). Estimates, not promises
 example changes file.
 
 ### M1: The demo lab (weekend 2)
-- [ ] `demo/` Docker Compose: SigNoz + 3 small Go services (storefront, orders,
-      wallet) instrumented with OpenTelemetry
+- [x] `demo/` Docker Compose: SigNoz + 3 small Go services (storefront, orders,
+      wallet) instrumented with OpenTelemetry; `make lab-up` finishes SigNoz's
+      first-run setup, and `make lab-smoke` (also in CI) proves traces arrive
 - [ ] `mockpay`: a fake external payment provider with switchable failure modes
       (healthy, outage, slow, suspended, rate-limited, expired cert)
 - [ ] Traffic generator
