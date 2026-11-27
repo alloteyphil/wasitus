@@ -91,7 +91,6 @@ type Collector interface {
   a warning) instead of failing the run.
 - A **lookback** (default 60 min) before `--from` is always collected, because the
   cause usually comes before the first symptom.
-- HTTP responses can be cached on disk for repeat runs (GitHub rate limits).
 
 v0.1 collectors:
 
@@ -175,7 +174,8 @@ tunes them.
   card-like numbers, tokens). On by default; `--no-redact` to disable locally.
 - Renderers: `table` (default, terminal), `markdown` (post-incident review), `json`
   (for other tools). Renderers are tested with golden files.
-- Exit codes: `0` verdict produced, `1` error, `3` ran but some collectors failed.
+- Exit codes: `0` verdict produced, `1` error, `2` bad command line, `3` ran
+  but some collectors failed.
 
 ## 8. Configuration
 
@@ -212,28 +212,30 @@ wasitus/
 │   │   ├── github/
 │   │   └── changesfile/
 │   ├── fingerprint/      # rules engine + built-in rules
+│   ├── traffic/          # 5-minute traffic spike and error-mix analysis
 │   ├── correlate/        # change scoring
 │   ├── verdict/          # verdict engine
 │   ├── redact/           # PII redaction
-│   └── render/           # table, markdown, json
+│   ├── render/           # table, markdown, json
+│   └── golden/           # golden-file test helper
 ├── demo/                 # the lab: compose file, services, mockpay, scenarios
-├── testdata/             # recorded API responses + golden outputs
-└── docs/                 # plan, architecture, scenarios, ADRs, devlog
+├── testdata/             # recorded scenario fixtures (S1-S8)
+└── docs/                 # plan, architecture, scenarios, ADRs
 ```
 
 `internal/` keeps the API private until it is worth stabilising. Packages depend
-"downwards" only: `cmd -> verdict -> correlate/fingerprint -> event`. Collectors
-depend on `event` only.
+"downwards" only: `cmd -> verdict -> correlate/fingerprint/traffic -> event`.
+Collectors depend on `event` only.
 
 ## 10. Testing strategy
 
 | Layer | Approach |
 |---|---|
-| Fingerprint, correlate, verdict | table-driven unit tests |
-| Collectors | record/replay: real responses captured from the lab, served by `httptest` |
-| Renderers | golden files (`go test ./... -update` to refresh) |
+| Fingerprint, traffic, correlate, verdict | table-driven unit tests |
+| Collectors | record/replay: API responses served by `httptest` |
+| Renderers | golden files (`UPDATE_GOLDEN=1 go test ./...` to refresh) |
 | End to end | scenario suite: recorded lab incident in, expected verdict out (runs in CI) |
-| Live | `make lab-test`: stage each scenario against the running lab (local only) |
+| Live | `make lab-smoke` and `make scenario ID=S2` against the running lab |
 
 ## 11. Security and privacy
 

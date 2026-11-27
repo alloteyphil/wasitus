@@ -8,7 +8,8 @@ lookback: 60m            # also collect this long before --from
 sources:
   changes_file: changes.yaml   # manual notes; relative to this file
 
-  # SigNoz (tested against v0.149.0): alert history and error-span summaries.
+  # SigNoz (tested against v0.149.0): alert history, error spans/logs, and
+  # 5-minute traffic/baseline buckets.
   # Use a read-only service-account API key (signoz-viewer role), stored in
   # the environment variable named below. If api_key_env is set and missing or
   # empty, wasitus stops with an error instead of sending unauthenticated calls.
@@ -30,3 +31,5 @@ sources:
 
 services:                      # repository -> telemetry service name
   alloteyphil/wasitus: orders-service
+
+# rules_file: rules.local.yaml # optional extra fingerprint rules (relative to this file)
