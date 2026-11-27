@@ -127,6 +127,19 @@ func TestLoad(t *testing.T) {
 	}
 }
 
+func TestLoadShippedConfigs(t *testing.T) {
+	for _, path := range []string{
+		"../../examples/wasitus.example.yaml",
+		"../../demo/wasitus.lab.yaml",
+	} {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			if _, err := Load(path); err != nil {
+				t.Fatalf("Load(%s) error = %v", path, err)
+			}
+		})
+	}
+}
+
 func TestSecret(t *testing.T) {
 	env := map[string]string{"SET": "s3cret", "EMPTY": ""}
 	lookup := func(k string) (string, bool) { v, ok := env[k]; return v, ok }

@@ -11,6 +11,7 @@ coverage.out
 .env.*
 *.local.yaml
 /wasitus.yaml
+demo/scenarios/changes.yaml
 
 # local Go workspace joining the tool and demo/ modules (see ADR-0006)
 go.work
