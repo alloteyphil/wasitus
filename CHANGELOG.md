@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-27
+
 ### Changed
 - Scenario docs and fixtures: stop calling `testdata/scenarios/*` "recorded";
   they are synthetic lab-shaped inputs. External scenarios (S2–S5, S7) now
@@ -75,3 +77,6 @@ All notable changes to this project are documented here. The format follows
 - Full CLI verdict pipeline (`wasitus timeline`) and offline end-to-end
   scenario test suite (`testdata/scenarios/S1`–`S8`) verifying 8/8 staged
   incidents in CI.
+
+[Unreleased]: https://github.com/alloteyphil/wasitus/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/alloteyphil/wasitus/releases/tag/v0.1.0
