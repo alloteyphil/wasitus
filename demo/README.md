@@ -32,9 +32,11 @@ database was created with a password the lab no longer uses.
 | A staged bad deploy (S1) | `ORDERS_VERSION=1.4.0 ORDERS_BUG_EVERY=5 docker compose -f demo/compose.yaml up -d orders-service` |
 
 A fresh SigNoz stores nothing until its first admin account exists, so
-`make lab-up` creates a lab-only admin. Its login is generated into
-`demo/.env` (`LAB_SIGNOZ_EMAIL`, `LAB_SIGNOZ_PASSWORD`), which git ignores.
-SigNoz's own files and where they come from: [signoz/README.md](signoz/README.md).
+`make lab-up` creates a lab-only admin, the lab's alert rules (error rate and
+checkout latency), and a read-only API key for wasitus. The login and the key
+are generated into `demo/.env` (`LAB_SIGNOZ_EMAIL`, `LAB_SIGNOZ_PASSWORD`,
+`SIGNOZ_API_KEY`), which git ignores. Details, and where SigNoz's own files
+come from: [signoz/README.md](signoz/README.md).
 
 ```
 demo/
