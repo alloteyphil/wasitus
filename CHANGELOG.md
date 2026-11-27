@@ -37,3 +37,7 @@ All notable changes to this project are documented here. The format follows
   `demo/.env`), both created by `make lab-up`.
 - ADR-0007 records how wasitus reads SigNoz v0.149.0: API key auth, the
   query and alert-history endpoints, their limits and units.
+- Demo lab with Docker: steady customer traffic (trafficgen, 2 checkouts/s,
+  rate changeable on :8091), and wallet-service now calls mockpay over HTTPS,
+  trusting a lab CA mockpay shares through a volume, so mockpay's badcert
+  mode stages an expired certificate (S5).
