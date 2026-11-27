@@ -6,9 +6,18 @@
 // and the server span records the provider's error code. That is the evidence
 // wasitus needs to say "external".
 //
+// mockpay also speaks HTTPS with certificates from its own lab CA. To call it
+// that way, set MOCKPAY_URL to https://mockpay:8443 and MOCKPAY_CA_FILE to the
+// CA certificate mockpay writes out (MOCKPAY_CA_OUT). When mockpay serves an
+// expired certificate (badcert mode, scenario S5), the call fails in the TLS
+// handshake: wallet answers 502 PaymentProviderUnreachable, and the span's
+// exception keeps the x509 error, such as "certificate has expired or is not
+// yet valid".
+//
 // Settings: LAB_ADDR (default ":8082"), MOCKPAY_URL (default
-// "http://localhost:8090"), WALLET_PROVIDER_TIMEOUT (default "3s"),
-// APP_VERSION, and the standard OTEL_* variables.
+// "http://localhost:8090"), MOCKPAY_CA_FILE (a PEM CA certificate to trust
+// as well as the system's roots; unset by default), WALLET_PROVIDER_TIMEOUT
+// (default "3s"), APP_VERSION, and the standard OTEL_* variables.
 package main
 
 import (
@@ -25,13 +34,25 @@ import (
 )
 
 func main() {
-	os.Exit(lab.Main("wallet-service", ":8082", func(t *lab.Telemetry) (http.Handler, error) {
-		timeout, err := lab.EnvDuration("WALLET_PROVIDER_TIMEOUT", 3*time.Second)
+	os.Exit(lab.Main("wallet-service", ":8082", build))
+}
+
+// build reads wallet-service's settings and returns its handler. A CA file
+// that cannot be used stops the service at startup.
+func build(t *lab.Telemetry) (http.Handler, error) {
+	timeout, err := lab.EnvDuration("WALLET_PROVIDER_TIMEOUT", 3*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	var opts []lab.ClientOption
+	if path := os.Getenv("MOCKPAY_CA_FILE"); path != "" {
+		pool, err := lab.LoadCAFile(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("MOCKPAY_CA_FILE: %w", err)
 		}
-		return newHandler(t, lab.Env("MOCKPAY_URL", "http://localhost:8090"), timeout), nil
-	}))
+		opts = append(opts, lab.WithRootCAs(pool))
+	}
+	return newHandler(t, lab.Env("MOCKPAY_URL", "http://localhost:8090"), timeout, opts...), nil
 }
 
 var providerAttr = attribute.String("payment.provider", "mockpay")
@@ -42,8 +63,8 @@ type wallet struct {
 	log        *slog.Logger
 }
 
-func newHandler(t *lab.Telemetry, mockpayURL string, timeout time.Duration) http.Handler {
-	s := &wallet{mockpay: lab.NewClient(t, timeout), mockpayURL: mockpayURL, log: t.Log}
+func newHandler(t *lab.Telemetry, mockpayURL string, timeout time.Duration, opts ...lab.ClientOption) http.Handler {
+	s := &wallet{mockpay: lab.NewClient(t, timeout, opts...), mockpayURL: mockpayURL, log: t.Log}
 	mux := lab.NewMux(t)
 	mux.HandleFunc("POST /payments", s.pay)
 	return mux
