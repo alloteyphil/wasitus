@@ -51,12 +51,12 @@ func Table(w io.Writer, t Timeline) error {
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(tw, "TIME\tKIND\tSOURCE\tSERVICE\tEVENT")
 		for _, e := range t.Events {
-			service := e.Service
+			service := oneLine(e.Service)
 			if service == "" {
 				service = "-"
 			}
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-				e.Time.In(loc).Format(layout), e.Kind, e.Source, oneLine(service), oneLine(e.Title))
+				e.Time.In(loc).Format(layout), e.Kind, e.Source, service, oneLine(e.Title))
 		}
 		if err := tw.Flush(); err != nil {
 			return err
@@ -70,12 +70,12 @@ func Table(w io.Writer, t Timeline) error {
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(tw, "CLASS\tSHARE\tCOUNT\tSERVICE\tSIGNATURE")
 		for _, g := range t.ErrorGroups {
-			service := g.Service
+			service := oneLine(g.Service)
 			if service == "" {
 				service = "-"
 			}
 			fmt.Fprintf(tw, "%s\t%.0f%%\t%d\t%s\t%s\n",
-				oneLine(g.Class), math.Round(g.Share*100), g.Count, oneLine(service), oneLine(g.Signature))
+				oneLine(g.Class), math.Round(g.Share*100), g.Count, service, oneLine(g.Signature))
 		}
 		if err := tw.Flush(); err != nil {
 			return err

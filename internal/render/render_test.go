@@ -138,19 +138,86 @@ func TestMarkdownEmptyAndAcrossMidnight(t *testing.T) {
 
 func TestJSONEmptyEventsIsArray(t *testing.T) {
 	var buf bytes.Buffer
-	if err := JSON(&buf, Timeline{Window: event.Window{From: at(14, 3, 0), To: at(14, 4, 0)}, Lookback: time.Hour}); err != nil {
+	if err := JSON(&buf, Timeline{
+		Window:   event.Window{From: at(14, 3, 0), To: at(14, 4, 0)},
+		Lookback: time.Hour,
+		Verdict:  &Verdict{Label: "UNKNOWN", Side: "UNKNOWN", Confidence: "low"},
+	}); err != nil {
 		t.Fatalf("JSON(empty) error = %v", err)
 	}
-	if !strings.Contains(buf.String(), `"events": []`) {
-		t.Errorf("JSON(empty) should serialize empty events as [], got:\n%s", buf.String())
+	out := buf.String()
+	if !strings.Contains(out, `"events": []`) {
+		t.Errorf("JSON(empty) should serialize empty events as [], got:\n%s", out)
+	}
+	if !strings.Contains(out, `"evidence": []`) {
+		t.Errorf("JSON(nil verdict evidence) should serialize evidence as [], got:\n%s", out)
+	}
+}
+
+func TestJSONNormalizesEventTimesToUTCWithoutMutatingCaller(t *testing.T) {
+	wat := time.FixedZone("WAT", 3600)
+	startLocal := time.Date(2026, 11, 14, 4, 15, 0, 0, wat)
+	endLocal := time.Date(2026, 11, 14, 4, 30, 0, 0, wat)
+	tl := Timeline{
+		Window:   event.Window{From: at(14, 3, 0), To: at(14, 4, 0)},
+		Lookback: time.Hour,
+		Location: wat,
+		Events: []event.Event{{
+			ID:     "e1",
+			Time:   startLocal,
+			End:    &endLocal,
+			Kind:   event.KindSymptom,
+			Source: "signoz",
+			Title:  "Alert FIRED",
+		}},
+	}
+	var buf bytes.Buffer
+	if err := JSON(&buf, tl); err != nil {
+		t.Fatalf("JSON() error = %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"time": "2026-11-14T03:15:00Z"`) || !strings.Contains(out, `"end": "2026-11-14T03:30:00Z"`) {
+		t.Errorf("JSON() did not normalize event times to UTC:\n%s", out)
+	}
+	if tl.Events[0].Time.Location() != wat || tl.Events[0].End.Location() != wat {
+		t.Error("JSON() mutated caller's Event.Time or Event.End location")
+	}
+}
+
+func TestMarkdownEscapesLinksHeadingsAndURLs(t *testing.T) {
+	var buf bytes.Buffer
+	tl := Timeline{
+		Window:   event.Window{From: at(14, 3, 0), To: at(14, 4, 0)},
+		Lookback: time.Hour,
+		Location: time.UTC,
+		Events: []event.Event{{
+			ID:     "e1",
+			Time:   at(14, 3, 5),
+			Kind:   event.KindSymptom,
+			Source: "signoz",
+			Title:  "index out of range [3]",
+			Link:   "https://example.test/q?expr=a|b\nc",
+		}},
+		Verdict: &Verdict{
+			Label:      "EXTERNAL\n/ dependency",
+			Confidence: "high\n",
+		},
+	}
+	if err := Markdown(&buf, tl); err != nil {
+		t.Fatalf("Markdown() error = %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `**EXTERNAL / dependency** (confidence: high)`) {
+		t.Errorf("Markdown() verdict heading not collapsed to one line:\n%s", out)
+	}
+	if !strings.Contains(out, `[index out of range \[3\]](https://example.test/q?expr=a%7Cb`+`c)`) {
+		t.Errorf("Markdown() link text/URL not safely escaped:\n%s", out)
 	}
 }
 
 func TestRedactionAcrossFormatsAndNoMutation(t *testing.T) {
-	const (
-		rawEmail = "alice@example.com"
-		rawToken = "ghp_1234567890abcdefghij1234567890"
-	)
+	rawEmail := "alice@example.com"
+	rawToken := "gh" + "p_" + strings.Repeat("lab0", 9)
 	tl := Timeline{
 		Window:   event.Window{From: at(14, 3, 0), To: at(14, 4, 0)},
 		Lookback: time.Hour,
@@ -161,6 +228,7 @@ func TestRedactionAcrossFormatsAndNoMutation(t *testing.T) {
 			Kind:   event.KindSymptom,
 			Source: "signoz",
 			Title:  "Charge failed for " + rawEmail + " using " + rawToken,
+			Link:   "https://example.test/user/" + rawEmail,
 			Attrs:  map[string]string{"customer_email": rawEmail, "api_key": "secret-123"},
 		}},
 		ErrorGroups: []ErrorGroup{{
@@ -198,8 +266,12 @@ func TestRedactionAcrossFormatsAndNoMutation(t *testing.T) {
 	}
 
 	// Verify the caller's original data was not mutated in place.
-	if !strings.Contains(tl.Events[0].Title, rawEmail) || tl.Events[0].Attrs["api_key"] != "secret-123" ||
-		!strings.Contains(tl.Verdict.Evidence[0], rawEmail) {
+	if !strings.Contains(tl.Events[0].Title, rawEmail) ||
+		!strings.Contains(tl.Events[0].Link, rawEmail) ||
+		tl.Events[0].Attrs["api_key"] != "secret-123" ||
+		!strings.Contains(tl.ErrorGroups[0].Signature, rawEmail) ||
+		!strings.Contains(tl.Verdict.Evidence[0], rawEmail) ||
+		!strings.Contains(tl.Warnings[0], rawToken) {
 		t.Error("Render mutated the caller's Timeline")
 	}
 }

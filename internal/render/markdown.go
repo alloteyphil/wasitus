@@ -25,7 +25,7 @@ func Markdown(w io.Writer, t Timeline) error {
 
 	if t.Verdict != nil {
 		fmt.Fprintf(&b, "\n## Verdict\n\n")
-		fmt.Fprintf(&b, "**%s** (confidence: %s)\n", mdEscape(t.Verdict.Label), mdEscape(t.Verdict.Confidence))
+		fmt.Fprintf(&b, "**%s** (confidence: %s)\n", mdEscape(oneLine(t.Verdict.Label)), mdEscape(oneLine(t.Verdict.Confidence)))
 		if len(t.Verdict.Evidence) > 0 {
 			b.WriteByte('\n')
 			for _, line := range t.Verdict.Evidence {
@@ -50,12 +50,12 @@ func Markdown(w io.Writer, t Timeline) error {
 				service = "-"
 			}
 			title := mdEscape(oneLine(e.Title))
-			if e.Link != "" {
-				title = fmt.Sprintf("[%s](%s)", title, mdEscapeURL(e.Link))
+			if link := strings.TrimSpace(e.Link); link != "" {
+				title = fmt.Sprintf("[%s](%s)", mdEscapeLinkText(title), mdEscapeURL(link))
 			}
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
 				e.Time.In(loc).Format(layout),
-				mdEscape(string(e.Kind)),
+				mdEscape(oneLine(string(e.Kind))),
 				mdEscape(oneLine(e.Source)),
 				mdEscape(service),
 				title,
@@ -97,8 +97,20 @@ func mdEscape(s string) string {
 	return strings.ReplaceAll(s, "|", `\|`)
 }
 
+func mdEscapeLinkText(s string) string {
+	s = strings.ReplaceAll(s, "[", `\[`)
+	return strings.ReplaceAll(s, "]", `\]`)
+}
+
 func mdEscapeURL(s string) string {
-	s = strings.ReplaceAll(s, "(", "%28")
-	s = strings.ReplaceAll(s, ")", "%29")
-	return strings.ReplaceAll(s, " ", "%20")
+	replacer := strings.NewReplacer(
+		"\r", "",
+		"\n", "",
+		"\t", "",
+		" ", "%20",
+		"(", "%28",
+		")", "%29",
+		"|", "%7C",
+	)
+	return replacer.Replace(s)
 }
