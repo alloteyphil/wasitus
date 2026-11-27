@@ -1,0 +1,61 @@
+{
+  "id": "S1",
+  "name": "Bad deploy",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "OUR_SIDE",
+  "expected_cause": "change",
+  "expected_label": "OUR_SIDE / change",
+  "expected_evidence_substrings": [
+    "Deployed v1.4.0 to production",
+    "orders-service",
+    "classified as code"
+  ],
+  "github_deployments": [
+    {
+      "id": 101,
+      "environment": "production",
+      "ref": "v1.4.0",
+      "description": "Deploy orders-service v1.4.0",
+      "created_at": "2026-11-26T08:56:00Z",
+      "creator": { "login": "lab-bot" }
+    }
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "orders-service",
+      "fired_at": "2026-11-26T09:02:00Z",
+      "value": 21.5
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:15Z",
+      "step_seconds": 30,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "500",
+      "exception_type": "*errors.errorString",
+      "message": "orders-service fault injected: internal order validation error"
+    },
+    {
+      "count": 3,
+      "start": "2026-11-26T09:00:20Z",
+      "step_seconds": 45,
+      "service": "storefront",
+      "kind": "Client",
+      "server_address": "orders-service",
+      "http_status": "500",
+      "exception_type": "*fmt.wrapError",
+      "message": "could not place the order: Post \"http://orders-service:8081/orders\": HTTP 500 InternalError"
+    }
+  ],
+  "traffic": {
+    "orders-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 122 },
+    "storefront":     { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 122 }
+  }
+}

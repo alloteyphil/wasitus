@@ -1,0 +1,41 @@
+{
+  "id": "S4",
+  "name": "Rate limited",
+  "window_from": "2026-11-26T09:00:00Z",
+  "window_to": "2026-11-26T09:15:00Z",
+  "expected_side": "EXTERNAL",
+  "expected_cause": "limit",
+  "expected_label": "EXTERNAL / limit",
+  "expected_evidence_substrings": [
+    "classified as limit",
+    "RateLimited",
+    "traffic also spiked"
+  ],
+  "signoz_alerts": [
+    {
+      "rule_id": "r-err",
+      "rule_name": "Lab error rate",
+      "severity": "critical",
+      "service": "wallet-service",
+      "fired_at": "2026-11-26T09:02:30Z",
+      "value": 74.0
+    }
+  ],
+  "error_spans": [
+    {
+      "count": 18,
+      "start": "2026-11-26T09:00:30Z",
+      "step_seconds": 20,
+      "service": "wallet-service",
+      "kind": "Client",
+      "server_address": "mockpay",
+      "http_status": "429",
+      "exception_type": "*fmt.wrapError",
+      "message": "mockpay rejected the charge: HTTP 429 RateLimited: Too many requests. Slow down."
+    }
+  ],
+  "traffic": {
+    "storefront":     { "baseline_req": 600, "baseline_err": 0, "window_req": 1920, "window_err": 1400 },
+    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 1920, "window_err": 1400 }
+  }
+}
