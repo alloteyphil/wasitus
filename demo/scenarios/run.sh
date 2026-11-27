@@ -26,20 +26,25 @@ say() { printf '%s  %s\n' "$(date -u +%H:%M:%SZ)" "$*"; }
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 set_mode() {
-  curl -fsS -o /dev/null -X PUT "$mockpay/admin/mode" -d "{\"mode\":\"$1\"}"
+  curl -fsS -o /dev/null -X PUT "$mockpay/admin/mode" -d "{\"mode\":\"$1\"}" || return
   say "mockpay: $1"
 }
 
 set_rate() {
-  curl -fsS -o /dev/null -X PUT "$traffic/admin/rate" -d "{\"multiplier\":$1}"
+  curl -fsS -o /dev/null -X PUT "$traffic/admin/rate" -d "{\"multiplier\":$1}" || return
   say "traffic: x$1"
 }
 
 # deploy VERSION BUG_EVERY: recreate orders-service, as a real deploy would.
 # BUG_EVERY=N makes every Nth order hit the staged bug (0: off).
 deploy() {
-  ORDERS_VERSION=$1 ORDERS_BUG_EVERY=$2 \
-    docker compose -f compose.yaml up -d --wait orders-service >/dev/null 2>&1
+  local out status=0
+  out=$(ORDERS_VERSION=$1 ORDERS_BUG_EVERY=$2 \
+    docker compose -f compose.yaml up -d --wait orders-service 2>&1) || status=$?
+  if ((status != 0)); then
+    printf '%s\n' "$out" >&2
+    return "$status"
+  fi
   say "orders-service: deployed $1 (bug every $2 orders; 0 means off)"
 }
 
@@ -79,8 +84,11 @@ reset_lab() {
   local ver bug
   if ver=$(orders_env APP_VERSION) && bug=$(orders_env ORDERS_BUG_EVERY); then
     if [[ "$ver" != "$normal_version" || "$bug" != 0 ]]; then
-      note orders-service "Rolled back orders-service to v$normal_version"
-      deploy "$normal_version" 0 || rc=1
+      if deploy "$normal_version" 0; then
+        note orders-service "Rolled back orders-service to v$normal_version"
+      else
+        rc=1
+      fi
     fi
   else
     say "orders-service: not running; skipping rollback check"
@@ -97,7 +105,7 @@ if [[ -z "$id" ]]; then
 fi
 if [[ "$id" == RESET ]]; then
   reset_lab
-  exit 0
+  exit $?
 fi
 case "$id" in
 S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8) ;;
