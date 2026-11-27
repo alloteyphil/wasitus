@@ -1,0 +1,11 @@
+---
+description: Never attribute commits or PRs to Cursor
+alwaysApply: true
+---
+
+# No Cursor attribution
+
+- Do not add `Co-authored-by: Cursor`, `Made-with: Cursor`, or any Cursor/cursoragent trailer to commits or PRs.
+- Do not pass `--trailer` for Cursor attribution.
+- If a trailer is injected anyway, strip it before pushing (amend only when amend rules allow; otherwise a new commit that rewrites the message via rebase/filter).
+- GitHub author/co-author must remain the human owner only (`alloteyphil` / Philip Allotey).
