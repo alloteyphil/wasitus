@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Finishes SigNoz's first-run setup, so the lab works with one command.
+# Finishes SigNoz's setup for the lab, so the lab works with one command.
 #
 # A fresh SigNoz accepts no telemetry until its first admin account exists:
 # until then the SigNoz server gives its ingester a do-nothing ("nop")
-# pipeline, and the OTLP ports stay closed. This script creates a lab-only
-# admin (credentials in demo/.env, which git ignores) and waits until the
-# ingester accepts OTLP. Safe to run again: it skips signup once SigNoz is set up.
+# pipeline, and the OTLP ports stay closed. This script:
+#   1. creates a lab-only admin (login in demo/.env, which git ignores) and
+#      waits until the ingester accepts OTLP;
+#   2. creates the alert rules in signoz/alerts/*.json;
+#   3. creates a read-only API key for wasitus (SIGNOZ_API_KEY in demo/.env)
+#      and checks that it works.
+# Safe to run again: every step is skipped once done (signoz/README.md).
 #
 # Run by `make lab-up`. Needs curl, jq and openssl.
 set -euo pipefail
@@ -47,7 +51,10 @@ if [[ "$setup_done" != "true" ]]; then
     curl -fsS -X POST "$signoz/api/v1/register" -H 'Content-Type: application/json' --data @- >/dev/null
   # A brand-new SigNoz (for example after make lab-reset) cannot know an API
   # key from an earlier one, so forget it; a new one is created below.
-  grep -v '^SIGNOZ_API_KEY=' "$env_file" >"$env_file.tmp" || true
+  # grep exits 1 when no line is left (fine) and 2 on a real error (stop,
+  # leaving .env as it was). The temp file holds secrets: .gitignore covers
+  # .env.* so an interrupted run can never get it committed.
+  grep -v '^SIGNOZ_API_KEY=' "$env_file" >"$env_file.tmp" || [[ $? -eq 1 ]]
   mv "$env_file.tmp" "$env_file"
 elif [[ "$just_generated" == true ]]; then
   echo "Warning: SigNoz was already set up, but demo/.env had no login, so the one just" >&2
@@ -83,12 +90,16 @@ fi
 # it through a file descriptor, never on its command line.
 org=$(curl -fsS "$signoz/api/v2/sessions/context?email=$(jq -rn --arg e "$email" '$e|@uri')&ref=$signoz" |
   jq -r '.data.orgs[0].id')
+# `|| true`: a refused login must reach the explanation below, not stop at a
+# bare curl error.
 session=$(LAB_EMAIL="$email" LAB_PASSWORD="$password" ORG_ID="$org" jq -n \
   '{email: env.LAB_EMAIL, password: env.LAB_PASSWORD, orgId: env.ORG_ID}' |
-  curl -fsS -X POST "$signoz/api/v2/sessions/email_password" -H 'Content-Type: application/json' --data @- |
-  jq -r '.data.accessToken')
+  curl -fs -X POST "$signoz/api/v2/sessions/email_password" -H 'Content-Type: application/json' --data @- |
+  jq -r '.data.accessToken') || true
 if [[ -z "$session" || "$session" == null ]]; then
-  echo "Could not log in to SigNoz with the LAB_SIGNOZ_* values in demo/.env" >&2
+  echo "Could not log in to SigNoz with the LAB_SIGNOZ_* values in demo/.env." >&2
+  echo "If demo/.env was deleted while the lab kept its data, start fresh:" >&2
+  echo "  make lab-reset && make lab-up" >&2
   exit 1
 fi
 
@@ -145,10 +156,13 @@ if [[ -z "$(get SIGNOZ_API_KEY)" ]]; then
 fi
 
 # Prove the key works and is the read-only account.
-who=$(curl -fsS "$signoz/api/v1/service_accounts/me" \
-  -H @<(printf 'SigNoz-Api-Key: %s\n' "$(get SIGNOZ_API_KEY)") | jq -r .data.name)
+# (A key expires after 90 days; `|| true` lets an expired or unknown key reach
+# the explanation instead of a bare curl error.)
+who=$(curl -fs "$signoz/api/v1/service_accounts/me" \
+  -H @<(printf 'SigNoz-Api-Key: %s\n' "$(get SIGNOZ_API_KEY)") | jq -r .data.name) || true
 if [[ "$who" != wasitus-reader ]]; then
-  echo "SIGNOZ_API_KEY in demo/.env does not work (got '$who'). Delete that line and run make lab-up." >&2
+  echo "SIGNOZ_API_KEY in demo/.env does not work (expired after 90 days, or from an" >&2
+  echo "earlier lab). Delete that line from demo/.env and run make lab-up again." >&2
   exit 1
 fi
 
