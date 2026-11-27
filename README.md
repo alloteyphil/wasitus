@@ -23,15 +23,11 @@ It is read-only, runs on your own machine, and sends your data nowhere.
 **Go (1.22+):**
 
 ```
-go install github.com/alloteyphil/wasitus/cmd/wasitus@latest
+go install github.com/alloteyphil/wasitus/cmd/wasitus@v0.1.0
 wasitus version
 ```
 
-Pin a release once `v0.1.0` is tagged:
-
-```
-go install github.com/alloteyphil/wasitus/cmd/wasitus@v0.1.0
-```
+Or track tip with `@latest`.
 
 **GitHub Release binaries** (macOS, Linux, Windows; amd64 and arm64): download
 from [Releases](https://github.com/alloteyphil/wasitus/releases), verify
@@ -42,10 +38,11 @@ quarantine flag if Gatekeeper blocks the binary:
 xattr -d com.apple.quarantine wasitus
 ```
 
-**Homebrew** (after the first release assets exist):
+**Homebrew:**
 
 ```
 brew install alloteyphil/wasitus/wasitus
+wasitus version
 ```
 
 **From source:**
