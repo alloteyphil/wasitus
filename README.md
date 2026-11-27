@@ -33,6 +33,15 @@ TIME   KIND      SOURCE        SERVICE         EVENT
 Exit codes: `0` success, `1` error, `2` bad command line, `3` result produced
 but some sources failed.
 
+### SigNoz permissions
+
+Give `wasitus` an API key for a SigNoz service account with the `signoz-viewer`
+role, stored in the environment variable named by `sources.signoz.api_key_env`
+(for example `SIGNOZ_API_KEY`). `wasitus` only makes read calls and never logs
+in with a password. Note that in SigNoz v0.149.0 a viewer key can also run raw
+ClickHouse SQL queries, so it can read all telemetry in that SigNoz instance
+(see [ADR-0007](docs/adr/0007-signoz-api.md)).
+
 ## What it will look like
 
 ```

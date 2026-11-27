@@ -90,22 +90,120 @@ func TestTimelinePartialFailure(t *testing.T) {
 
 func TestTimelineConfigProblems(t *testing.T) {
 	dir := t.TempDir()
-	signozOnly := filepath.Join(dir, "signoz-only.yaml")
-	write(t, signozOnly, "sources:\n  signoz:\n    url: http://localhost:8080\n")
-
-	tests := []struct {
-		name, config, want string
-	}{
-		{"missing file", filepath.Join(dir, "nope.yaml"), "read config"},
-		{"only unsupported sources", signozOnly, "none of the configured sources is supported yet"},
+	code, _, errOut := runCLI("timeline", "--config", filepath.Join(dir, "nope.yaml"), "--from", "-1h")
+	if code != exitError || !strings.Contains(errOut, "read config") {
+		t.Errorf("exit %d, stderr %q; want exit %d and read config", code, errOut, exitError)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			code, _, errOut := runCLI("timeline", "--config", tt.config, "--from", "-1h")
-			if code != exitError || !strings.Contains(errOut, tt.want) {
-				t.Errorf("exit %d, stderr %q; want exit %d and %q", code, errOut, exitError, tt.want)
+}
+
+const testSigNozKeyEnv = "WASITUS_TEST_SIGNOZ_API_KEY"
+
+func sigNozConfig(t *testing.T, url, keyEnv string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "wasitus.yaml")
+	var b strings.Builder
+	fmt.Fprintf(&b, "sources:\n  signoz:\n    url: %s\n", url)
+	if keyEnv != "" {
+		fmt.Fprintf(&b, "    api_key_env: %s\n", keyEnv)
+	}
+	write(t, path, b.String())
+	return path
+}
+
+func TestTimelineSigNoz(t *testing.T) {
+	t.Setenv(testSigNozKeyEnv, "fake-signoz-key-for-tests")
+	var mu sync.Mutex
+	var keys []string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/version":
+			fmt.Fprint(w, `{"version":"v0.150.0","setupCompleted":true}`)
+		case "/api/v3/rules":
+			mu.Lock()
+			keys = append(keys, r.Header.Get("SigNoz-Api-Key"))
+			mu.Unlock()
+			fmt.Fprint(w, `{"status":"success","data":{"rules":[{"id":"r1","alert":"Lab error rate","labels":{"severity":"critical"}}],"total":1}}`)
+		case "/api/v2/rules/r1/history/timeline":
+			mu.Lock()
+			keys = append(keys, r.Header.Get("SigNoz-Api-Key"))
+			mu.Unlock()
+			fmt.Fprint(w, `{"status":"success","data":{"items":[{"ruleId":"r1","ruleName":"Lab error rate","state":"firing","stateChanged":true,"unixMilli":1795683780000,"labels":[{"key":{"name":"service.name"},"value":"wallet-service"}],"fingerprint":1,"value":31.4}],"total":1}}`)
+		case "/api/v5/query_range":
+			mu.Lock()
+			keys = append(keys, r.Header.Get("SigNoz-Api-Key"))
+			mu.Unlock()
+			fmt.Fprint(w, `{"status":"success","data":{"type":"raw","data":{"results":[{"queryName":"A","rows":[{"timestamp":"2026-11-26T09:01:10Z","data":{"span_id":"sp1","kind_string":"Server","response_status_code":"502","resource":{"service.name":"wallet-service"},"events":[{"name":"exception","attributes":{"exception.message":"HTTP 402 AccountSuspended"}}]}}]}]}}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	code, out, errOut := runCLI("timeline", "--config", sigNozConfig(t, srv.URL, testSigNozKeyEnv), "--from", "-1h")
+	if code != exitOK {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	for _, want := range []string{
+		"09:01  symptom  signoz  wallet-service  1 error span (HTTP 402 AccountSuspended)",
+		"09:03  symptom  signoz  wallet-service  Alert FIRED: Lab error rate",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("stdout does not contain %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(errOut, "warning: signoz: SigNoz version v0.150.0 differs from tested version") {
+		t.Errorf("stderr = %q, want SigNoz version warning", errOut)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(keys) == 0 {
+		t.Fatal("no authenticated requests reached fake SigNoz")
+	}
+	for _, k := range keys {
+		if k != "fake-signoz-key-for-tests" {
+			t.Errorf("SigNoz-Api-Key = %q, want key from %s", k, testSigNozKeyEnv)
+		}
+	}
+}
+
+func TestTimelineSigNozFailureIsPartial(t *testing.T) {
+	t.Setenv(testSigNozKeyEnv, "fake-signoz-secret-99")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"status":"error","error":{"message":"invalid api key"}}`, http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	code, _, errOut := runCLI("timeline", "--config", sigNozConfig(t, srv.URL, testSigNozKeyEnv), "--from", "-1h")
+	if code != exitPartial {
+		t.Errorf("exit = %d, want %d", code, exitPartial)
+	}
+	if !strings.Contains(errOut, "warning: signoz:") || !strings.Contains(errOut, "unauthorized") {
+		t.Errorf("stderr = %q, want signoz unauthorized warning", errOut)
+	}
+	if strings.Contains(errOut, "fake-signoz-secret-99") {
+		t.Errorf("stderr leaked API key: %q", errOut)
+	}
+}
+
+func TestTimelineSigNozAPIKeyMissing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request %s without API key", r.URL)
+	}))
+	defer srv.Close()
+
+	for _, unset := range []bool{false, true} {
+		t.Setenv(testSigNozKeyEnv, "")
+		if unset {
+			if err := os.Unsetenv(testSigNozKeyEnv); err != nil {
+				t.Fatal(err)
 			}
-		})
+		}
+		code, _, errOut := runCLI("timeline", "--config", sigNozConfig(t, srv.URL, testSigNozKeyEnv), "--from", "-1h")
+		want := "environment variable " + testSigNozKeyEnv + " is not set"
+		if code != exitError || !strings.Contains(errOut, want) {
+			t.Errorf("exit %d, stderr %q; want exit %d and %q", code, errOut, exitError, want)
+		}
 	}
 }
 
