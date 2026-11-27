@@ -37,6 +37,10 @@ var redactCases = []redactCase{
 	{"email", "notify orders-ops@wallet-service.example now", "notify [email] now"},
 	{"email with tag and brackets", "<a.b+tag@orders.lab.example>", "<[email]>"},
 	{"email in a query", "/v1/users?email=ama.mensah@mockpay.example&page=2", "/v1/users?email=[email]&page=2"},
+	{"email before a colon and a space", "contact orders-ops@lab.example: thanks", "contact [email]: thanks"},
+	// The host:port exception must not let ordinary digit secrets through.
+	{"digits secret after a blank", "db.password: 123456", "db.password: [token]"},
+	{"digits secret after =", "password=123456", "password=[token]"},
 
 	// Phone numbers.
 	{"Ghana international with spaces", "callback +233 24 123 4567", "callback [phone]"},
@@ -139,6 +143,12 @@ var keepCases = []string{
 	"padded 0000000042 and 0012345678",
 	"024 1 2345678", // a one-digit group is not a phone grouping
 	"invoice INV-2026-0244123456",
+	// Logins and hosts, not mailboxes or secrets (found in review of PR #14).
+	"git clone ssh://git@github.com/lab-org/orders.git",
+	"remote: git@github.com:lab-org/orders.git",
+	"https://deploy@orders-service.lab/v1/orders",
+	"dial tcp secrets.lab:8200: connect: connection refused",
+	`Post "http://token-service:8080/v1/issue": context deadline exceeded`,
 	"[email] [phone] [card] [token]",
 	"password=",
 	`"password": ""`,

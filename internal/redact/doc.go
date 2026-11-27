@@ -44,6 +44,9 @@
 // addresses and ports, decimals (0.0244123456), IDs that glue digits to
 // letters (ord_000123, INV-2026-0244123456, ch_000042), trace and span IDs,
 // short numbers and amounts (2500, 50,000.00), and URLs without credentials.
+// The user@host of a remote is a login, not a mailbox, and is kept
+// (ssh://git@github.com/org/repo, git@github.com:org/repo.git), as is a
+// host:port whose name happens to contain a secret word (secrets.lab:8200).
 //
 // # Known limits
 //
@@ -55,5 +58,17 @@
 //   - An unquoted secret value ends at the first space, comma, semicolon,
 //     ampersand or quote.
 //   - Names, postal addresses and other personal data in prose are not
-//     detected.
+//     detected. Email addresses are ASCII only (josé@example.com is missed).
+//   - Not covered: HTTP Digest authorization parameters, Cookie and
+//     Set-Cookie headers, URL-encoded keys (password%3D...), JSON escaped
+//     more than once, and URL passwords containing '/' or '@'. A five-part
+//     JWE is only partly redacted.
+//   - Secrets glued to a word (my_ghp_..., card_4111...) are not found.
+//   - Some values are over-redacted: counts named like secrets
+//     (max_tokens=4096), a '+' followed by 7 to 15 digits (read as a phone
+//     number), and 13- to 19-digit IDs that happen to pass the Luhn check
+//     (read as card numbers).
+//   - A digits-only value glued to its key by a bare ':' is taken for a
+//     host:port and kept, so "password:123456" is not redacted (with a blank,
+//     "password: 123456", it is).
 package redact

@@ -36,7 +36,7 @@ func redactKeyValues(s string) string {
 			continue
 		}
 		start, end := valueBounds(s, valueAt)
-		if start == end || isPlaceholder(s[start:end]) {
+		if start == end || isPlaceholder(s[start:end]) || isHostPort(s, valueAt, start, end) {
 			continue
 		}
 		b.WriteString(s[last:start])
@@ -95,6 +95,28 @@ func skipAuthScheme(s string, i, limit int) int {
 		return i
 	}
 	return i + m[1]
+}
+
+// isHostPort reports whether a "key: value" match is really host:port, as in
+// "dial tcp secrets.lab:8200" or "token-service:8080": the value is only
+// digits, unquoted, and glued to the name by a bare ':' with no blank on
+// either side. Network errors are full of these, and wiping the port would
+// destroy the evidence. The price: a digits-only secret written the same way
+// ("password:123456") is kept; the package docs list this limit.
+func isHostPort(s string, valueAt, start, end int) bool {
+	if valueAt < 2 || start != valueAt || s[valueAt-1] != ':' {
+		return false
+	}
+	if p := s[valueAt-2]; !isWordByte(p) && p != '.' && p != '-' {
+		return false
+	}
+	// The port: digits, then the end of the value, a path, or the ':' that
+	// Go's network errors put after the address ("secrets.lab:8200: connect").
+	i := start
+	for i < end && isDigit(s[i]) {
+		i++
+	}
+	return i > start && (i == end || s[i] == ':' || s[i] == '/')
 }
 
 func isValueDelimiter(c byte) bool {
