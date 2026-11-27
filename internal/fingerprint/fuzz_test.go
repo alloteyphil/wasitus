@@ -1,8 +1,47 @@
 package fingerprint
 
 import (
+	"strings"
 	"testing"
 )
+
+// FuzzSignature feeds arbitrary messages (error text comes from outside) to
+// the signature normaliser. It must never panic, and its result must be
+// stable: normalising it again changes nothing, white space is collapsed and
+// trimmed, and no standalone number is left.
+func FuzzSignature(f *testing.F) {
+	seeds := []string{
+		"",
+		"   ",
+		"could not place the order: HTTP 502 PaymentFailed: payment for ord_000123 failed: HTTP 402 AccountSuspended: overdue",
+		"runtime error: index out of range [1] with length 1",
+		`mockpay did not answer in time: Post "http://mockpay:8090/v1/charges": context deadline exceeded`,
+		"dial tcp 172.18.0.5:8090: connect: connection refused",
+		"charge 3f2b8c1e-9a4d-4e2f-8b1a-0c9d8e7f6a5b at 2026-11-26T10:00:00.5+00:00",
+		"trace 4bf92f3577b34da6a3ce929d0e0e4736 ptr 0xc000123456 cus_42 1x_2",
+		"2026-11-26T10:00:00Z2026-11-27 took 3.002s 1500ms 64KiB 5xx 1_000 x509 v1",
+		"a b c\td\n",
+		"\xff\xfe 12 \xc3",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, msg string) {
+		got := normalise(msg)
+		if again := normalise(got); again != got {
+			t.Fatalf("normalise is not stable:\n%q\n-> %q\n-> %q", msg, got, again)
+		}
+		if strings.Join(strings.Fields(got), " ") != got {
+			t.Fatalf("normalise(%q) = %q: white space not collapsed", msg, got)
+		}
+		if loc := numberPattern.FindStringIndex(got); loc != nil {
+			t.Fatalf("normalise(%q) = %q: number %q left", msg, got, got[loc[0]:loc[1]])
+		}
+		if sig := signature(Sample{Message: msg}); sig == "" {
+			t.Fatalf("signature(%q) is empty", msg)
+		}
+	})
+}
 
 // FuzzLoadRules feeds arbitrary bytes to LoadRules as user rules. It must
 // never panic, and a rule set it accepts must classify any sample into a
