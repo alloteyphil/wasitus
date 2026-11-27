@@ -76,11 +76,20 @@ type Client struct {
 	http *http.Client
 }
 
-// NewClient returns a traced client that gives up after timeout.
-func NewClient(t *Telemetry, timeout time.Duration) *Client {
+// NewClient returns a traced client that gives up after timeout. Without
+// options it uses http.DefaultTransport, so it trusts the system's roots.
+func NewClient(t *Telemetry, timeout time.Duration, opts ...ClientOption) *Client {
+	var cfg clientConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	base := http.DefaultTransport
+	if cfg.rootCAs != nil {
+		base = transportTrusting(cfg.rootCAs)
+	}
 	return &Client{http: &http.Client{
 		Timeout: timeout,
-		Transport: otelhttp.NewTransport(http.DefaultTransport,
+		Transport: otelhttp.NewTransport(base,
 			otelhttp.WithTracerProvider(t.Tracer), otelhttp.WithPropagators(t.Propagator)),
 	}}
 }
