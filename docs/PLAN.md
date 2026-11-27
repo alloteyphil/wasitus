@@ -129,8 +129,8 @@ timeline, and the collector tests run offline.
 ### M5: Ship v0.1 (in progress, 27 Nov 2026)
 - [x] Tag v0.1.0 (the release pipeline already exists from M0) + Homebrew tap
 - [x] README with demo GIF and 10-minute quickstart against the lab
-- [ ] Design write-up / blog post: "Was it us? Telling our failures from someone
-      else's"
+- [x] Design write-up / blog post: "Was it us? Telling our failures from someone
+      else's" ([docs/writeups/was-it-us.md](writeups/was-it-us.md))
 - [ ] Add the project to the portfolio site (`../portfolio`)
 - [ ] Share: LinkedIn post, SigNoz and OpenTelemetry community channels
 
