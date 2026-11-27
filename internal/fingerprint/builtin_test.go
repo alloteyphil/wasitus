@@ -103,7 +103,16 @@ func TestBuiltinRulesClassifyTheLab(t *testing.T) {
 		{"badcert: wallet answers", Sample{Service: "wallet-service", HTTPStatus: 502, ExceptionType: wrapErr, Message: expired}, ClassExpiry, "expiry-certificate"},
 		{"badcert: orders answers", Sample{Service: "orders-service", HTTPStatus: 502, ExceptionType: wrapErr, Message: expiredOrders}, ClassExpiry, "expiry-certificate"},
 		{"badcert: storefront answers", Sample{Service: "storefront", HTTPStatus: 502, ExceptionType: wrapErr, Message: expiredStorefront}, ClassExpiry, "expiry-certificate"},
-		{"tls verify failure without x509 text", Sample{Service: "wallet-service", Outbound: true, ServerAddress: "mockpay", Message: "tls: failed to verify certificate"}, ClassExpiry, "expiry-certificate"},
+		// A verification failure is expiry only with expiry wording: an unknown
+		// CA or a wrong host name can be our own trust store or configuration
+		// (review of PR #15). Without that evidence the fallbacks decide.
+		{"tls verify failure without expiry text", Sample{Service: "wallet-service", Outbound: true, ServerAddress: "mockpay", Message: "tls: failed to verify certificate"}, ClassDependency, FallbackOutbound},
+		{"unknown certificate authority", Sample{Service: "wallet-service", Outbound: true, ServerAddress: "mockpay", Message: "tls: failed to verify certificate: x509: certificate signed by unknown authority"}, ClassDependency, FallbackOutbound},
+		{"certificate not yet valid", Sample{Service: "wallet-service", Outbound: true, ServerAddress: "mockpay", Message: "x509: certificate is not yet valid"}, ClassExpiry, "expiry-certificate"},
+		// A panic logged without an exception type stays code even when its
+		// text mentions a provider word or a provider URL (review of PR #15).
+		{"panic text naming an account word", Sample{Service: "orders-service", HTTPStatus: 500, Message: "runtime error: invalid memory address; PaymentRequired field missing"}, ClassCode, "go-runtime-panic"},
+		{"panic text naming a provider call", Sample{Service: "orders-service", HTTPStatus: 500, Message: `runtime error: nil pointer after Get "http://mockpay:8090/x": context deadline exceeded`}, ClassCode, "go-runtime-panic"},
 
 		// S1: the staged bad deploy in orders-service is code at every hop.
 		{"bad deploy: orders panics", Sample{Service: "orders-service", HTTPStatus: 500, ExceptionType: "runtime.boundsError", Message: "runtime error: index out of range [1] with length 1"}, ClassCode, "go-runtime-panic"},
