@@ -1,8 +1,15 @@
-# Recorded scenario fixtures
+# Scenario fixtures (synthetic)
 
-Each subdirectory (`S1/` through `S8/`) holds the recorded inputs for one
-scenario from [docs/SCENARIOS.md](../../docs/SCENARIOS.md) and is replayed
-offline through `httptest` servers by `cmd/wasitus/scenario_test.go`.
+Each subdirectory (`S1/` through `S8/`) holds a **hand-authored** JSON fixture
+for one scenario from [docs/SCENARIOS.md](../../docs/SCENARIOS.md). CI replays
+them through `httptest` servers in `cmd/wasitus/scenario_test.go`. They are
+**not** byte-for-byte recordings of a live SigNoz session.
+
+They are shaped like the demo lab (multi-service checkout chain, mockpay error
+text, 5-minute traffic buckets, alert history) and include cascade spans/logs so
+offline verdicts stay honest about class-share dilution. Update a fixture when
+live `make scenario ID=…` behaviour changes in a way that would break the
+contract.
 
 Run all scenarios:
 

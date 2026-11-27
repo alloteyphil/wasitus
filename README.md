@@ -14,7 +14,7 @@ It is read-only, runs on your own machine, and sends your data nowhere.
 > traffic), GitHub (merged PRs, deployments, releases), and a local changes
 > file, then fingerprints errors, checks for traffic spikes, correlates recent
 > changes, and produces a deterministic verdict in table, Markdown, or JSON
-> format with PII redaction on by default. All 8/8 staged scenarios in
+> format with PII redaction on by default. All 8/8 synthetic staged scenarios in
 > [docs/SCENARIOS.md](docs/SCENARIOS.md) pass in CI. See
 > [docs/PLAN.md](docs/PLAN.md).
 

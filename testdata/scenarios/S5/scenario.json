@@ -10,6 +10,7 @@
     "classified as expiry",
     "x509"
   ],
+  "expected_min_dominant_share": 0.7,
   "signoz_alerts": [
     {
       "rule_id": "r-err",
@@ -22,17 +23,105 @@
   ],
   "error_spans": [
     {
-      "count": 12,
+      "count": 10,
       "start": "2026-11-26T09:00:10Z",
       "step_seconds": 25,
       "service": "wallet-service",
       "kind": "Client",
       "server_address": "mockpay",
       "exception_type": "*url.Error",
-      "message": "could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid"
+      "message": "could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:11Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "*fmt.wrapError",
+      "message": "payment for ord_000312 failed: HTTP 502 PaymentProviderUnreachable: could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:12Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "*fmt.wrapError",
+      "message": "could not place the order: HTTP 502 PaymentFailed: payment for ord_000312 failed: HTTP 502 PaymentProviderUnreachable: could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:13Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "502",
+      "message": "HTTP 502"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:14Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "kind": "Client",
+      "server_address": "orders-service",
+      "http_status": "502",
+      "message": "HTTP 502"
+    }
+  ],
+  "error_logs": [
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "message": "request failed: could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "message": "tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:11Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "http_status": "502",
+      "message": "request failed: payment for ord_000312 failed: HTTP 502 PaymentProviderUnreachable: could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:12Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "http_status": "502",
+      "message": "request failed: could not place the order: HTTP 502 PaymentFailed: payment for ord_000312 failed: HTTP 502 PaymentProviderUnreachable: could not reach mockpay: Post \"https://mockpay:8443/v1/charges\": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2026-11-26T09:00:10Z is after 2020-01-01T00:00:00Z"
     }
   ],
   "traffic": {
-    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 600 }
+    "storefront": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    },
+    "orders-service": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    },
+    "wallet-service": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    }
   }
 }

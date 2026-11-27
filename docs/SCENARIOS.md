@@ -1,8 +1,11 @@
 # Staged incident scenarios
 
-These are the test contract for the verdict engine. Each scenario is staged in the
-demo lab, recorded into `testdata/scenarios/<id>/`, and replayed in CI. A release
-ships only if every scenario produces its expected verdict.
+These are the test contract for the verdict engine. Each scenario can be staged in
+the demo lab. CI does **not** replay captured lab API dumps: it replays
+**synthetic** fixtures in `testdata/scenarios/<id>/scenario.json` (hand-authored
+batches of spans, logs, alerts, and traffic shaped like the lab, including
+multi-service error cascades). A release ships only if every scenario produces
+its expected verdict.
 
 ## The lab
 
@@ -22,7 +25,7 @@ all services ──► OpenTelemetry ──► SigNoz (local)
 
 | ID | Name | How it is staged | Expected verdict |
 |---|---|---|---|
-| S1 | Bad deploy | Deploy an orders-service version that throws on 20% of requests | `OUR_SIDE / change` → that deploy |
+| S1 | Bad deploy | Deploy an orders-service version that faults every 5th order (~20%) | `OUR_SIDE / change` → that deploy |
 | S2 | Provider outage | `mockpay` → `outage` | `EXTERNAL / dependency` → mockpay |
 | S3 | Suspended account | `mockpay` → `suspended` | `EXTERNAL / account` |
 | S4 | Rate limited | `mockpay` → `ratelimit`, traffic x3 | `EXTERNAL / limit` |
@@ -36,15 +39,16 @@ recent deploy. S8 proves it admits when it does not know.
 
 ## Running and staging scenarios
 
-Run the offline scenario suite (replays `testdata/scenarios/S1`–`S8` through
-`httptest`, as CI does):
+Run the offline synthetic scenario suite (as CI does):
 
 ```
 go test ./... -run TestScenario
 go test ./... -run Scenario/S3
 ```
 
-Stage a live incident in the local demo lab and run `wasitus` against it:
+Stage a live incident in the local demo lab and run `wasitus` against it (this is
+the source of truth for realism; keep the synthetic fixtures honest when live
+behaviour changes):
 
 ```
 make lab-up

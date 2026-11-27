@@ -9,8 +9,10 @@
   "expected_evidence_substrings": [
     "Deployed v1.4.0 to production",
     "orders-service",
-    "classified as code"
+    "classified as code",
+    "runtime error"
   ],
+  "expected_min_dominant_share": 0.9,
   "github_deployments": [
     {
       "id": 101,
@@ -18,7 +20,9 @@
       "ref": "v1.4.0",
       "description": "Deploy orders-service v1.4.0",
       "created_at": "2026-11-26T08:56:00Z",
-      "creator": { "login": "lab-bot" }
+      "creator": {
+        "login": "lab-bot"
+      }
     }
   ],
   "signoz_alerts": [
@@ -39,23 +43,70 @@
       "service": "orders-service",
       "kind": "Server",
       "http_status": "500",
-      "exception_type": "*errors.errorString",
-      "message": "orders-service fault injected: internal order validation error"
+      "exception_type": "runtime.boundsError",
+      "message": "runtime error: index out of range [1] with length 1"
     },
     {
-      "count": 3,
+      "count": 10,
+      "start": "2026-11-26T09:00:15Z",
+      "step_seconds": 30,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "500",
+      "exception_type": "",
+      "message": "panic: runtime error: index out of range [1] with length 1"
+    },
+    {
+      "count": 10,
       "start": "2026-11-26T09:00:20Z",
-      "step_seconds": 45,
+      "step_seconds": 30,
       "service": "storefront",
       "kind": "Client",
       "server_address": "orders-service",
       "http_status": "500",
       "exception_type": "*fmt.wrapError",
-      "message": "could not place the order: Post \"http://orders-service:8081/orders\": HTTP 500 InternalError"
+      "message": "could not place the order: HTTP 500 InternalError: Something went wrong."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:20Z",
+      "step_seconds": 30,
+      "service": "storefront",
+      "kind": "Server",
+      "http_status": "500",
+      "message": "HTTP 500"
+    }
+  ],
+  "error_logs": [
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:15Z",
+      "step_seconds": 30,
+      "service": "orders-service",
+      "http_status": "500",
+      "message": "request failed: panic: runtime error: index out of range [1] with length 1"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:20Z",
+      "step_seconds": 30,
+      "service": "storefront",
+      "http_status": "500",
+      "message": "request failed: could not place the order: HTTP 500 InternalError: Something went wrong."
     }
   ],
   "traffic": {
-    "orders-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 122 },
-    "storefront":     { "baseline_req": 600, "baseline_err": 0, "window_req": 610, "window_err": 122 }
+    "orders-service": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 610,
+      "window_err": 122
+    },
+    "storefront": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 610,
+      "window_err": 122
+    }
   }
 }
