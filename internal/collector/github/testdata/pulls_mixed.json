@@ -1,0 +1,57 @@
+[
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/pulls/7",
+    "id": 107,
+    "number": 7,
+    "state": "closed",
+    "title": "test: cover the wallet-service retry path",
+    "user": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/alloteyphil/wasitus/pull/7",
+    "created_at": "2026-11-26T15:00:00Z",
+    "updated_at": "2026-11-26T17:40:00Z",
+    "closed_at": "2026-11-26T15:30:00Z",
+    "merged_at": "2026-11-26T15:30:00Z",
+    "merge_commit_sha": "2222222222222222222222222222222222222222",
+    "draft": false
+  },
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/pulls/9",
+    "id": 109,
+    "number": 9,
+    "state": "closed",
+    "title": "feat: closed without merging",
+    "user": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/alloteyphil/wasitus/pull/9",
+    "created_at": "2026-11-26T15:00:00Z",
+    "updated_at": "2026-11-26T17:25:00Z",
+    "closed_at": "2026-11-26T17:25:00Z",
+    "merged_at": null,
+    "merge_commit_sha": "1111111111111111111111111111111111111111",
+    "draft": false
+  },
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/pulls/8",
+    "id": 108,
+    "number": 8,
+    "state": "closed",
+    "title": "docs(readme): explain the lookback",
+    "user": null,
+    "html_url": "https://github.com/alloteyphil/wasitus/pull/8",
+    "created_at": "2026-11-26T15:00:00Z",
+    "updated_at": "2026-11-26T17:20:00Z",
+    "closed_at": "2026-11-26T17:20:00Z",
+    "merged_at": "2026-11-26T17:20:00Z",
+    "merge_commit_sha": null,
+    "draft": false
+  }
+]

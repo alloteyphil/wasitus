@@ -1,0 +1,60 @@
+[
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/releases/7003",
+    "html_url": "https://github.com/alloteyphil/wasitus/releases/tag/untagged-fixture",
+    "id": 7003,
+    "node_id": "RE_fixture7003",
+    "tag_name": "v0.2.0",
+    "target_commitish": "main",
+    "name": "v0.2.0 (draft)",
+    "body": "",
+    "draft": true,
+    "prerelease": false,
+    "created_at": "2026-11-26T17:20:00Z",
+    "published_at": null,
+    "author": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "assets": []
+  },
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/releases/7002",
+    "html_url": "https://github.com/alloteyphil/wasitus/releases/tag/v0.1.0",
+    "id": 7002,
+    "node_id": "RE_fixture7002",
+    "tag_name": "v0.1.0",
+    "target_commitish": "main",
+    "name": "v0.1.0",
+    "body": "",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-11-26T17:14:00Z",
+    "published_at": "2026-11-26T17:15:00Z",
+    "author": {
+      "login": "lab-bot",
+      "id": 1,
+      "type": "Bot",
+      "site_admin": false
+    },
+    "assets": []
+  },
+  {
+    "url": "https://api.github.com/repos/alloteyphil/wasitus/releases/7001",
+    "html_url": "https://github.com/alloteyphil/wasitus/releases/tag/v0.0.1",
+    "id": 7001,
+    "node_id": "RE_fixture7001",
+    "tag_name": "v0.0.1",
+    "target_commitish": "main",
+    "name": "v0.0.1",
+    "body": "",
+    "draft": false,
+    "prerelease": true,
+    "created_at": "2026-11-20T10:00:00Z",
+    "published_at": "2026-11-20T10:00:00Z",
+    "author": null,
+    "assets": []
+  }
+]
