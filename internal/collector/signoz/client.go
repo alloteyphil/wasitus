@@ -79,10 +79,27 @@ func NewClient(baseURL, apiKey string, httpClient *http.Client) (*Client, error)
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+	clientCopy := *httpClient
+	prevRedirect := clientCopy.CheckRedirect
+	clientCopy.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if !strings.EqualFold(req.URL.Host, base.Host) {
+			return fmt.Errorf("refusing cross-host redirect to %s", req.URL.Host)
+		}
+		if base.Scheme == "https" && !strings.EqualFold(req.URL.Scheme, "https") {
+			return fmt.Errorf("refusing redirect downgrade to %s", req.URL.Scheme)
+		}
+		if prevRedirect != nil {
+			return prevRedirect(req, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
 	return &Client{
 		base:               base,
 		apiKey:             apiKey,
-		http:               httpClient,
+		http:               &clientCopy,
 		rawPageLimit:       DefaultRawPageLimit,
 		maxRuleConcurrency: defaultConcurrency,
 		maxBody:            defaultMaxBody,
