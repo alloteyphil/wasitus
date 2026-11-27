@@ -12,12 +12,14 @@ The lab is its own Go module, so the tool's dependencies stay small
 Needs Docker with about 6 GB of memory for containers. From the repository root:
 
 ```
-make lab-up      # build and start SigNoz + the lab, wait until healthy
-make lab-smoke   # prove it works: checkouts, a staged failure, traces in SigNoz
-make lab-ps      # what is running
-make lab-logs    # follow the logs
-make lab-down    # stop (data kept)
-make lab-reset   # stop and delete all lab data
+make lab-up              # build and start SigNoz + the lab, wait until healthy
+make lab-smoke           # prove it works: checkouts, a staged failure, traces in SigNoz
+make scenario ID=S2      # stage a scenario from docs/SCENARIOS.md (S1..S8, default 6m)
+make scenario-reset      # put mockpay, trafficgen and orders-service back to normal
+make lab-ps              # what is running
+make lab-logs            # follow the logs
+make lab-down            # stop (data kept)
+make lab-reset           # stop and delete all lab data
 ```
 
 All ports are bound to 127.0.0.1, so only your machine can reach the lab. If
@@ -52,7 +54,22 @@ demo/
 │   └── wallet/
 ├── mockpay/             # fake external payment provider        (done)
 ├── trafficgen/          # the customers: steady checkouts         (done)
-└── scenarios/           # S1..S8 stage/reset scripts            (coming)
+├── scenarios/           # S1..S8 stage/reset script               (done)
+└── wasitus.lab.yaml     # wasitus config for the local lab        (done)
+```
+
+## Staged scenarios
+
+`make scenario ID=S2` (optional `MINUTES=6`) stages one incident from
+[docs/SCENARIOS.md](../docs/SCENARIOS.md), holds it long enough for SigNoz's
+alert rules to fire, and always resets the lab on exit or Ctrl-C. Deploys and
+rollbacks (S1, S7) are recorded in `demo/scenarios/changes.yaml` (gitignored),
+which `demo/wasitus.lab.yaml` reads as the changes file:
+
+```
+make scenario ID=S2
+set -a && source demo/.env && set +a
+go run ./cmd/wasitus timeline --config demo/wasitus.lab.yaml --from -15m
 ```
 
 ## Lab services

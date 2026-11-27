@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.." # demo/
 mockpay=${MOCKPAY_URL:-http://localhost:8090}
 traffic=${TRAFFIC_URL:-http://localhost:8091}
-changes=scenarios/changes.yaml
+changes=${CHANGES_FILE:-scenarios/changes.yaml}
 normal_version=1.3.0 # orders-service's version when nothing is staged
 
 say() { printf '%s  %s\n' "$(date -u +%H:%M:%SZ)" "$*"; }
@@ -45,15 +45,23 @@ deploy() {
 
 # orders_env NAME: an environment variable of the running orders-service.
 orders_env() {
-  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' \
-    "$(docker compose -f compose.yaml ps -q orders-service)" | sed -n "s/^$1=//p"
+  local cid
+  cid=$(docker compose -f compose.yaml ps -q orders-service)
+  [[ -n "$cid" ]] || return 1
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid" | sed -n "s/^$1=//p"
+}
+
+# init_changes ensures the changes file exists so `wasitus timeline` against
+# demo/wasitus.lab.yaml succeeds even after scenarios that make no deploys.
+init_changes() {
+  if [[ ! -f "$changes" ]]; then
+    printf '# What "people did" during staged incidents. Written by demo/scenarios/run.sh.\n' >"$changes"
+  fi
 }
 
 # note SERVICE TITLE: a change, as a person would write it down.
 note() {
-  if [[ ! -f "$changes" ]]; then
-    printf '# What "people did" during staged incidents. Written by demo/scenarios/run.sh.\n' >"$changes"
-  fi
+  init_changes
   printf -- '- time: "%s"\n  kind: change\n  service: %s\n  title: "%s"\n' "$(now)" "$1" "$2" >>"$changes"
 }
 
@@ -62,13 +70,23 @@ hold() {
   sleep $(($1 * 60))
 }
 
+# reset_lab tries every reset step even if one fails, so a transient error in
+# one service never leaves another service stuck in a broken state.
 reset_lab() {
-  set_mode healthy
-  set_rate 1
-  if [[ "$(orders_env APP_VERSION)" != "$normal_version" || "$(orders_env ORDERS_BUG_EVERY)" != 0 ]]; then
-    note orders-service "Rolled back orders-service to v$normal_version"
-    deploy "$normal_version" 0
+  local rc=0
+  set_mode healthy || rc=1
+  set_rate 1 || rc=1
+  local ver bug
+  if ver=$(orders_env APP_VERSION) && bug=$(orders_env ORDERS_BUG_EVERY); then
+    if [[ "$ver" != "$normal_version" || "$bug" != 0 ]]; then
+      note orders-service "Rolled back orders-service to v$normal_version"
+      deploy "$normal_version" 0 || rc=1
+    fi
+  else
+    say "orders-service: not running; skipping rollback check"
+    rc=1
   fi
+  return "$rc"
 }
 
 id=$(tr '[:lower:]' '[:upper:]' <<<"${1:-}")
@@ -81,16 +99,28 @@ if [[ "$id" == RESET ]]; then
   reset_lab
   exit 0
 fi
+case "$id" in
+S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8) ;;
+*)
+  echo "unknown scenario '$1': use S1 to S8 or reset" >&2
+  exit 2
+  ;;
+esac
 if ! [[ "$minutes" =~ ^[1-9][0-9]*$ ]]; then
   echo "minutes must be a whole number of at least 1, got '$minutes'" >&2
   exit 2
 fi
-curl -fsS -o /dev/null "$mockpay/healthz" || {
+curl -fs -o /dev/null "$mockpay/healthz" || {
   echo "The lab is not running (mockpay does not answer). Start it: make lab-up" >&2
   exit 1
 }
+curl -fs -o /dev/null "$traffic/healthz" || {
+  echo "The lab is not running (trafficgen does not answer). Start it: make lab-up" >&2
+  exit 1
+}
 
-trap 'say "resetting the lab"; reset_lab' EXIT
+init_changes
+trap 'say "resetting the lab"; reset_lab || true' EXIT
 start=$(now)
 say "scenario $id: starting"
 
@@ -131,21 +161,23 @@ S7) # Red herring: a harmless deploy, then 5 minutes later the provider
   hold "$minutes"
   ;;
 S8) # Unclear: small, mixed provider errors and no change. No cause dominates.
+  # At 2 req/s, mockpay's 60/min rate limit takes 30s to exhaust, so 40s in
+  # ratelimit produces ~20 errors (429), matching 10s of outage and 10s of
+  # suspended (~20 errors each) so all three classes stay roughly even.
   end=$(($(date +%s) + minutes * 60))
   while (($(date +%s) < end)); do
-    for step in "ratelimit 20" "healthy 40" "outage 10" "healthy 40" "suspended 10" "healthy 40"; do
+    for step in "ratelimit 40" "healthy 30" "outage 10" "healthy 30" "suspended 10" "healthy 30"; do
+      rem=$((end - $(date +%s)))
+      ((rem <= 0)) && break
       read -r m secs <<<"$step"
+      ((secs > rem)) && secs=$rem
       set_mode "$m"
       sleep "$secs"
     done
   done
   ;;
-*)
-  echo "unknown scenario '$1': use S1 to S8 or reset" >&2
-  trap - EXIT
-  exit 2
-  ;;
 esac
 
-say "scenario $id: done. Incident window (UTC): $start to $(now)"
-say "see it: wasitus timeline --config demo/wasitus.lab.yaml --from $start --to $(now)"
+end_time=$(now)
+say "scenario $id: done. Incident window (UTC): $start to $end_time"
+say "see it: wasitus timeline --config demo/wasitus.lab.yaml --from $start --to $end_time"

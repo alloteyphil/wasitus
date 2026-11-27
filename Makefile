@@ -49,7 +49,7 @@ lint:
 
 LAB := docker compose -f demo/compose.yaml
 
-.PHONY: lab-up lab-down lab-reset lab-ps lab-logs lab-smoke
+.PHONY: lab-up lab-down lab-reset lab-ps lab-logs lab-smoke scenario scenario-reset
 
 # Build and start SigNoz and the lab, wait until every service is healthy,
 # then finish SigNoz's first-run setup (it ingests nothing until then).
@@ -75,3 +75,11 @@ lab-logs:
 # traces of both in SigNoz. CI runs this too (.github/workflows/lab.yml).
 lab-smoke:
 	demo/scripts/smoke.sh
+
+# Stage one incident from docs/SCENARIOS.md (e.g. make scenario ID=S2 [MINUTES=6]).
+scenario:
+	demo/scenarios/run.sh "$(ID)" $(MINUTES)
+
+# Put the running lab back to normal (mockpay healthy, traffic x1, orders-service v1.3.0).
+scenario-reset:
+	demo/scenarios/run.sh reset
