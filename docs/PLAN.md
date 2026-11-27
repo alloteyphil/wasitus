@@ -52,10 +52,10 @@ evidence-backed verdict on which side the cause sits.
 - Demo lab: small multi-service app + fake payment provider + local SigNoz, with
   scripts that stage each scenario
 
-### Not in v0.1 (backlog, see section 7)
-AWS Health / CloudTrail, provider status-page feeds, synthetic dependency probes,
-certificate-expiry scanning, other backends (Prometheus, Grafana, Datadog), AI
-summary, Slack output, MCP server, web UI.
+### Not in v0.1 (versioned in §5b / section 7)
+Other observability backends (Prometheus, Loki/OTLP, Datadog), status-page feeds,
+synthetic dependency probes, certificate-expiry scanning, AWS Health / CloudTrail,
+AI summary, Slack output, MCP server, web UI.
 
 ## 4. Milestones
 
@@ -152,20 +152,50 @@ without asking me anything. Met for v0.1.0.
 | 6 | 17 Jan | M4 Verdict |
 | 7 | 24–31 Jan → **done early 27 Nov** | M5 Ship v0.1 |
 
-## 5b. Version vision (after v0.1)
+## 5b. Version vision (after v0.1) — accessibility via more backends
 
 v0.1 proved the thesis for a **narrow niche**: OTel/SigNoz + GitHub, deterministic
-"our change vs external" verdicts, honest `UNKNOWN`. It will not be mass-market
-until more backends and lower friction exist. Ship versions that widen the wedge
-without diluting the deterministic core ([ADR-0004](adr/0004-deterministic-verdict.md)).
+"our change vs external" verdicts, honest `UNKNOWN`. Most developers never touch
+SigNoz. The lever for reach is **more observability backends** that still feed
+the same `Event` → fingerprint → verdict pipeline
+([ADR-0008](adr/0008-multi-backend-observability.md)).
 
-| Version | Goal | In scope | Exit criteria |
+Backends ship by **capability** (`alerts` / `errors` / `traffic`), not as
+all-or-nothing SigNoz clones. One major backend path per minor version; fixtures
+and synthetic scenarios before live demos.
+
+```mermaid
+flowchart LR
+  subgraph collect [Collectors read-only]
+    SigNoz[SigNoz v0.1]
+    Prom[Prometheus v0.2]
+    Loki[Loki_or_OTLP v0.3]
+    DD[Datadog v0.4]
+  end
+  subgraph core [Unchanged core]
+    Ev[Event model]
+    Fp[Fingerprint]
+    Ver[Verdict]
+  end
+  SigNoz --> Ev
+  Prom --> Ev
+  Loki --> Ev
+  DD --> Ev
+  Ev --> Fp --> Ver
+```
+
+| Version | Goal | Observability / evidence | Exit criteria |
 |---|---|---|---|
-| **v0.1** (shipped) | Prove the thesis | SigNoz + GitHub + changes file, lab S1–S8, brew/GitHub release | Stranger installs and reproduces a verdict |
-| **v0.2** | Cheap external evidence | Status-page JSON feeds; cert/domain/token expiry checks; synthetic dependency probes | ≥2 new EXTERNAL scenarios green in CI without blaming deploys |
-| **v0.3** | Meet teams where they work | Slack (or similar) Markdown output; second observability backend (Prometheus or Grafana) | One non-SigNoz path documented end-to-end |
-| **v0.4** | Cloud / change depth | AWS Health + CloudTrail (or equivalent) collectors; richer change_type rules | S7-style red-herring still passes with cloud noise |
-| **v1.0** | Agent- and team-ready | Opt-in AI summary that cannot change the verdict; MCP server mode; Datadog or equivalent optional backend | v0.1 scenarios still pass; summary cites evidence only |
+| **v0.1** (shipped) | Prove the thesis | SigNoz (alerts+errors+traffic) + GitHub + changes file | Stranger installs and reproduces a verdict |
+| **v0.2** | Reach Prometheus shops + cheap externals | **Prometheus + Alertmanager** (traffic + alerts); status-page JSON; cert/domain/token expiry checks; synthetic dependency probes | Non-SigNoz config documented; ≥1 traffic/alert scenario + ≥2 EXTERNAL scenarios green in CI |
+| **v0.3** | Fingerprints without SigNoz | **Grafana Loki** and/or **OTLP/HTTP** error logs/spans (errors capability); Slack Markdown output | S2/S3-style EXTERNAL class from non-SigNoz errors in CI |
+| **v0.4** | Commercial / cloud reach | **Datadog** collector (subset OK); AWS Health + CloudTrail | Datadog quickstart; S7-style red herring still passes with cloud noise |
+| **v1.0** | Agent- and team-ready | Optional third backend (e.g. New Relic or Elastic) only if demanded; opt-in AI summary (cannot change verdict); MCP server | All prior scenario contracts still pass; summary cites evidence only |
+
+**Why this order.** Prometheus is the widest free footprint for rates and alerts.
+Logs/traces (Loki/OTLP) unlock account/limit/expiry classes without SigNoz.
+Datadog unlocks companies that will never run a local SigNoz. Status pages and
+expiry checks in v0.2 help every backend equally and are small PRs.
 
 Hard rules that survive every version: read-only collectors, own-data lab, no
 employer data, verdicts stay deterministic, AI never decides.
@@ -187,15 +217,17 @@ employer data, verdicts stay deterministic, AI never decides.
 
 | Item | Target | Why it matters |
 |---|---|---|
-| Synthetic dependency probes | v0.2 | Catches provider outages when the provider has no status page |
-| Status-page feeds (Statuspage-style JSON) | v0.2 | Cheap external evidence |
-| Certificate, domain and token expiry checks | v0.2 | A common, embarrassing cause |
-| Slack (or chat) output | v0.3 | Teams live there during incidents |
-| Prometheus/Grafana backend | v0.3 | Users beyond SigNoz |
+| Prometheus + Alertmanager collector (`alerts`, `traffic`) | v0.2 | Largest OSS footprint beyond SigNoz |
+| Status-page feeds (Statuspage-style JSON) | v0.2 | Cheap external evidence for every backend |
+| Certificate, domain and token expiry checks | v0.2 | Common EXTERNAL cause; backend-agnostic |
+| Synthetic dependency probes | v0.2 | Provider outages with no status page |
+| Grafana Loki and/or OTLP errors collector | v0.3 | Fingerprinting without SigNoz |
+| Slack (or chat) Markdown output | v0.3 | Teams live there during incidents |
+| Datadog collector | v0.4 | Commercial reach |
 | AWS Health + CloudTrail collectors | v0.4 | Cloud outages and config changes |
-| Datadog (or equivalent) backend | v1.0 | Broader adoption path |
-| AI-written incident summary (opt-in) | v1.0 | Readable post-incident draft; cites evidence only |
-| MCP server mode | v1.0 | Lets AI agents call `wasitus` during investigations |
+| New Relic / Elastic (if demand) | v1.0 | Extra backend only when justified |
+| AI-written incident summary (opt-in) | v1.0 | Post-incident draft; cites evidence only |
+| MCP server mode | v1.0 | Agents call `wasitus` during investigations |
 
 ## 8. Risks
 

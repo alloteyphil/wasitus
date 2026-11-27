@@ -102,6 +102,11 @@ v0.1 collectors:
 | `github` | change | merged PRs, deployments, releases |
 | `changesfile` | change / external | YAML file of manual notes ("02:30 restarted Redis") |
 
+**Later backends** (Prometheus, Loki/OTLP, Datadog, …) implement the same
+`Collector` interface and declare which of `alerts` / `errors` / `traffic` they
+provide. See [ADR-0008](adr/0008-multi-backend-observability.md) and
+[PLAN §5b](PLAN.md).
+
 ## 4. Fingerprinting
 
 Input: error samples (from spans and logs) with fields such as HTTP status, server
