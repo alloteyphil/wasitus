@@ -9,8 +9,11 @@ your observability and change data, then tells you where the evidence points:
 
 It is read-only, runs on your own machine, and sends your data nowhere.
 
-> **Status: early development (M0).** The timeline works with manual notes;
-> SigNoz and GitHub sources and the verdict are next. See [docs/PLAN.md](docs/PLAN.md).
+> **Status: early development (M1 to M2).** The timeline reads manual notes and
+> GitHub (merged PRs, deployments, releases). Error classification, change
+> scoring, spike detection and redaction exist as packages; the SigNoz source,
+> wiring them into the CLI, and the verdict are next. A demo lab with SigNoz
+> runs with one command (`make lab-up`). See [docs/PLAN.md](docs/PLAN.md).
 
 ## Try it
 

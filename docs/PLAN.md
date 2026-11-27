@@ -82,9 +82,10 @@ example changes file.
 - [x] `demo/` Docker Compose: SigNoz + 3 small Go services (storefront, orders,
       wallet) instrumented with OpenTelemetry; `make lab-up` finishes SigNoz's
       first-run setup, and `make lab-smoke` (also in CI) proves traces arrive
-- [ ] `mockpay`: a fake external payment provider with switchable failure modes
-      (healthy, outage, slow, suspended, rate-limited, expired cert)
-- [ ] Traffic generator
+- [x] `mockpay`: a fake external payment provider with switchable failure modes
+      (healthy, outage, slow, suspended, rate-limited, expired cert); in Docker,
+      wallet-service calls it over HTTPS so the expired cert really bites
+- [x] Traffic generator (runs in the lab at 2 checkouts/s; rate changeable)
 - [ ] `demo/scenarios/*.sh` to stage and reset each scenario
 - [x] Alert rules in SigNoz for error rate and latency (`demo/signoz/alerts/`,
       created by `make lab-up`)
