@@ -32,3 +32,8 @@ All notable changes to this project are documented here. The format follows
   services and completes SigNoz's first-run setup; `make lab-smoke` checks
   that checkouts work and their traces reach SigNoz (also run in CI when the
   lab changes, and weekly).
+- Demo lab: SigNoz alert rules for a service's error rate and for checkout
+  latency, and a read-only SigNoz API key for wasitus (`SIGNOZ_API_KEY` in
+  `demo/.env`), both created by `make lab-up`.
+- ADR-0007 records how wasitus reads SigNoz v0.149.0: API key auth, the
+  query and alert-history endpoints, their limits and units.

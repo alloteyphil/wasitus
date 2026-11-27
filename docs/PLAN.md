@@ -86,14 +86,15 @@ example changes file.
       (healthy, outage, slow, suspended, rate-limited, expired cert)
 - [ ] Traffic generator
 - [ ] `demo/scenarios/*.sh` to stage and reset each scenario
-- [ ] Alert rules in SigNoz for error rate and latency
+- [x] Alert rules in SigNoz for error rate and latency (`demo/signoz/alerts/`,
+      created by `make lab-up`)
 
 **Done when:** `make lab-up && make scenario S2` produces a visible incident in the
 local SigNoz.
 
 ### M2: The timeline (weekend 3)
-- [ ] Spike: confirm which SigNoz API endpoints give alert history and query
-      traces/logs (record findings in an ADR)
+- [x] Spike: confirm which SigNoz API endpoints give alert history and query
+      traces/logs (record findings in an ADR): docs/adr/0007-signoz-api.md
 - [ ] Collectors: SigNoz alerts, GitHub (PRs, deployments, releases)
 - [ ] Record/replay test harness: real API responses saved to `testdata/`, replayed
       through `httptest` servers in CI
