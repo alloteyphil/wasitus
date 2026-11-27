@@ -202,6 +202,10 @@ func decodeRulesList(body []byte) (rulesListData, error) {
 }
 
 func (c *Client) ruleHistory(ctx context.Context, rule alertRule, w event.Window) ([]ruleHistoryItem, []string, error) {
+	if rule.ID == "" || strings.Contains(rule.ID, "/") || rule.ID == "." || rule.ID == ".." {
+		return nil, []string{fmt.Sprintf("signoz skipped rule with unsafe id %q", rule.ID)}, nil
+	}
+
 	var all []ruleHistoryItem
 	var warns []string
 	cursor := ""
@@ -263,11 +267,12 @@ func (c *Client) historyToEvents(rule alertRule, items []ruleHistoryItem, w even
 		return cmp.Or(
 			cmp.Compare(a.Fingerprint, b.Fingerprint),
 			cmp.Compare(a.UnixMilli, b.UnixMilli),
-			cmp.Compare(a.State, b.State),
+			cmp.Compare(strings.ToLower(strings.TrimSpace(a.State)), strings.ToLower(strings.TrimSpace(b.State))),
 		)
 	})
 
 	events := make([]event.Event, 0, len(sorted))
+	seenIDs := make(map[string]struct{}, len(sorted))
 	// openFiring tracks the index in events of the most recent unresolved
 	// firing event per fingerprint, so a subsequent inactive transition sets End.
 	openFiring := make(map[uint64]int)
@@ -302,8 +307,13 @@ func (c *Client) historyToEvents(rule alertRule, items []ruleHistoryItem, w even
 
 		switch state {
 		case "firing":
+			id := alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "firing")
+			if _, dup := seenIDs[id]; dup {
+				continue
+			}
+			seenIDs[id] = struct{}{}
 			ev := event.Event{
-				ID:       alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "firing"),
+				ID:       id,
 				Time:     ts,
 				Kind:     event.KindSymptom,
 				Source:   Source,
@@ -317,13 +327,18 @@ func (c *Client) historyToEvents(rule alertRule, items []ruleHistoryItem, w even
 			events = append(events, ev)
 
 		case "inactive":
+			id := alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "resolved")
+			if _, dup := seenIDs[id]; dup {
+				continue
+			}
+			seenIDs[id] = struct{}{}
 			if idx, ok := openFiring[item.Fingerprint]; ok {
 				end := ts
 				events[idx].End = &end
 				delete(openFiring, item.Fingerprint)
 			}
 			ev := event.Event{
-				ID:       alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "resolved"),
+				ID:       id,
 				Time:     ts,
 				Kind:     event.KindSymptom,
 				Source:   Source,
@@ -336,8 +351,13 @@ func (c *Client) historyToEvents(rule alertRule, items []ruleHistoryItem, w even
 			events = append(events, ev)
 
 		case "nodata":
+			id := alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "nodata")
+			if _, dup := seenIDs[id]; dup {
+				continue
+			}
+			seenIDs[id] = struct{}{}
 			ev := event.Event{
-				ID:       alertEventID(ruleID, item.Fingerprint, item.UnixMilli, "nodata"),
+				ID:       id,
 				Time:     ts,
 				Kind:     event.KindSymptom,
 				Source:   Source,

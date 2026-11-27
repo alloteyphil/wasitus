@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,8 +55,8 @@ func TestNewClientValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	if c.http != http.DefaultClient {
-		t.Error("expected nil httpClient to default to http.DefaultClient")
+	if c.http == nil || c.http == http.DefaultClient {
+		t.Error("expected nil httpClient to use an isolated copy, not http.DefaultClient directly")
 	}
 }
 
@@ -884,5 +885,124 @@ func TestErrorSampleAndSummaryEdgeCases(t *testing.T) {
 	col, _ := New(srv.URL, "k", srv.Client())
 	if col.Warnings() != nil {
 		t.Errorf("fresh Collector.Warnings() = %v, want nil", col.Warnings())
+	}
+}
+
+func TestCrossHostRedirectBlocked(t *testing.T) {
+	otherHit := false
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		otherHit = true
+		if r.Header.Get("SigNoz-Api-Key") != "" {
+			t.Error("SigNoz-Api-Key leaked to cross-host redirect target")
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer other.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(srv.URL, "super-secret-api-key", srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CheckAuth(context.Background()); err == nil || !strings.Contains(err.Error(), "refusing cross-host redirect") {
+		t.Errorf("CheckAuth(redirect) err = %v, want cross-host redirect refusal", err)
+	}
+	if otherHit {
+		t.Error("redirect target should not have been contacted")
+	}
+}
+
+func TestRawQueryPageCapStopsAmplification(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		// Always return 2 rows (== rawPageLimit) regardless of time range.
+		fmt.Fprint(w, `{"status":"success","data":{"type":"raw","data":{"results":[{"queryName":"A","rows":[
+			{"timestamp":"2026-11-26T09:05:00Z","data":{"span_id":"s1","resource":{"service.name":"wallet-service"}}},
+			{"timestamp":"2026-11-26T09:06:00Z","data":{"span_id":"s2","resource":{"service.name":"wallet-service"}}}
+		]}]}}}`)
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(srv.URL, "k", srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.rawPageLimit = 2
+
+	samples, warns, err := c.ErrorSpans(context.Background(), testWindow(t))
+	if err != nil {
+		t.Fatalf("ErrorSpans() error = %v", err)
+	}
+	if got := int(calls.Load()); got > maxRawPages {
+		t.Errorf("made %d requests, want <= %d", got, maxRawPages)
+	}
+	if len(samples) != 2 {
+		t.Errorf("got %d samples, want 2 deduplicated samples retained on cap", len(samples))
+	}
+	if len(warns) == 0 || !strings.Contains(warns[0], "could not split further") {
+		t.Errorf("warns = %v, want page-limit warning", warns)
+	}
+}
+
+func TestAlertDuplicateFiringPreservesEnd(t *testing.T) {
+	c, err := NewClient("http://localhost:8080", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := alertRule{ID: "r1", Alert: "Lab error rate", Labels: map[string]string{"severity": "critical"}}
+	firedAt := time.Date(2026, 11, 26, 9, 5, 0, 0, time.UTC).UnixMilli()
+	resolvedAt := time.Date(2026, 11, 26, 9, 10, 0, 0, time.UTC).UnixMilli()
+
+	items := []ruleHistoryItem{
+		{RuleID: "r1", RuleName: "Lab error rate", State: "firing", StateChanged: true, UnixMilli: firedAt, Fingerprint: 42},
+		{RuleID: "r1", RuleName: "Lab error rate", State: "FIRING", StateChanged: true, UnixMilli: firedAt, Fingerprint: 42},
+		{RuleID: "r1", RuleName: "Lab error rate", State: "inactive", StateChanged: true, UnixMilli: resolvedAt, Fingerprint: 42},
+	}
+	evs := c.historyToEvents(rule, items, testWindow(t))
+	if len(evs) != 2 {
+		t.Fatalf("got %d events, want 2 (1 fired, 1 resolved): %+v", len(evs), evs)
+	}
+	if evs[0].End == nil || !evs[0].End.Equal(time.UnixMilli(resolvedAt).UTC()) {
+		t.Errorf("fired event End = %v, want %v", evs[0].End, time.UnixMilli(resolvedAt).UTC())
+	}
+}
+
+func TestTrafficOverflowAndInvalidValues(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		fmt.Fprint(w, `{"status":"success","data":{"type":"time_series","data":{"results":[
+			{"queryName":"A","aggregations":[{"index":0,"series":[{"labels":[{"key":{"name":"service.name"},"value":"orders-service"}],"values":[
+				{"timestamp":1795683600000,"value":100},
+				{"timestamp":1795683900000,"value":-0.4},
+				{"timestamp":1795684200000,"value":1e20}
+			]}]}]},
+			{"queryName":"C","aggregations":[{"index":0,"series":[{"labels":[{"key":{"name":"service.name"},"value":"orders-service"}],"values":[
+				{"timestamp":1795683600000,"value":999}
+			]}]}]}
+		]}}}`)
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(srv.URL, "k", srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Step > math.MaxInt64/1440 (~74 days) must not overflow chunkSpan into an infinite loop.
+	buckets, _, err := c.TrafficBuckets(context.Background(), testWindow(t), 100*24*time.Hour)
+	if err != nil {
+		t.Fatalf("TrafficBuckets(large step) error = %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Errorf("calls = %d, want 1", calls.Load())
+	}
+	bs := buckets["orders-service"]
+	if len(bs) != 1 || bs[0].Requests != 100 || bs[0].Errors != 0 {
+		t.Errorf("buckets = %+v, want single valid bucket (100 req, 0 err)", bs)
 	}
 }

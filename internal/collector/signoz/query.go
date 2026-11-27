@@ -11,9 +11,13 @@ import (
 	"github.com/alloteyphil/wasitus/internal/event"
 )
 
-// maxSplitDepth caps recursive time-range splitting for raw queries. Even for a
-// 24-hour window (86,400,000 ms), 27 halvings reach single-millisecond width.
-const maxSplitDepth = 30
+// maxSplitDepth caps recursive time-range splitting for raw queries, and
+// maxRawPages caps the total number of raw query requests per call so a dense
+// burst or misbehaving proxy cannot trigger exponential request amplification.
+const (
+	maxSplitDepth = 30
+	maxRawPages   = 50
+)
 
 // queryRangeRequest matches SigNoz v0.149.0 POST /api/v5/query_range.
 type queryRangeRequest struct {
@@ -141,6 +145,9 @@ func extractWarnings(w *queryWarnData) []string {
 func (c *Client) queryRaw(ctx context.Context, w event.Window, signal, filterExpr string, keyFn func(rawRow) string) ([]rawRow, []string, error) {
 	startMs := w.From.UTC().UnixMilli()
 	endMs := w.To.UTC().UnixMilli()
+	if w.To.UTC().Nanosecond()%int(time.Millisecond) != 0 {
+		endMs++
+	}
 	if endMs <= startMs {
 		return nil, nil, nil
 	}
@@ -148,7 +155,10 @@ func (c *Client) queryRaw(ctx context.Context, w event.Window, signal, filterExp
 	var rows []rawRow
 	var warnings []string
 	seen := make(map[string]struct{})
-	err := c.queryRawRange(ctx, startMs, endMs, 0, signal, filterExpr, keyFn, seen, &rows, &warnings)
+	// Reserve 1 request for the root query; each split reserves 2 more up front
+	// so left/right halves always run as a pair and total requests stay <= maxRawPages.
+	budget := maxRawPages - 1
+	err := c.queryRawRange(ctx, startMs, endMs, 0, &budget, signal, filterExpr, keyFn, seen, &rows, &warnings)
 	return rows, dedupeStrings(warnings), err
 }
 
@@ -156,6 +166,7 @@ func (c *Client) queryRawRange(
 	ctx context.Context,
 	startMs, endMs int64,
 	depth int,
+	budget *int,
 	signal, filterExpr string,
 	keyFn func(rawRow) string,
 	seen map[string]struct{},
@@ -195,12 +206,13 @@ func (c *Client) queryRawRange(
 	}
 
 	if len(pageRows) >= limit {
-		if endMs-startMs > 1 && depth < maxSplitDepth {
+		if endMs-startMs > 1 && depth < maxSplitDepth && *budget >= 2 {
+			*budget -= 2
 			mid := startMs + (endMs-startMs)/2
-			if err := c.queryRawRange(ctx, startMs, mid, depth+1, signal, filterExpr, keyFn, seen, rows, warnings); err != nil {
+			if err := c.queryRawRange(ctx, startMs, mid, depth+1, budget, signal, filterExpr, keyFn, seen, rows, warnings); err != nil {
 				return err
 			}
-			return c.queryRawRange(ctx, mid, endMs, depth+1, signal, filterExpr, keyFn, seen, rows, warnings)
+			return c.queryRawRange(ctx, mid, endMs, depth+1, budget, signal, filterExpr, keyFn, seen, rows, warnings)
 		}
 		*warnings = append(*warnings, fmt.Sprintf(
 			"signoz %s query hit the %d-row page limit between %d and %d ms and could not split further; results may be incomplete",

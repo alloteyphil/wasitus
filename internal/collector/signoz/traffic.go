@@ -1,7 +1,6 @@
 package signoz
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -70,7 +69,10 @@ func (c *Client) TrafficBuckets(ctx context.Context, w event.Window, step time.D
 		return nil, nil, fmt.Errorf("signoz: traffic step must be a positive whole number of seconds, got %s", step)
 	}
 
-	chunkSpan := min(MaxBaselineChunk, time.Duration(maxPointsPerChunk)*step)
+	chunkSpan := MaxBaselineChunk
+	if step < MaxBaselineChunk/maxPointsPerChunk {
+		chunkSpan = time.Duration(maxPointsPerChunk) * step
+	}
 	type slotKey struct {
 		service string
 		tsMs    int64
@@ -100,7 +102,15 @@ func (c *Client) TrafficBuckets(ctx context.Context, w event.Window, step time.D
 		}
 
 		for _, res := range series {
-			isErrQuery := res.QueryName == "B"
+			var isErrQuery bool
+			switch res.QueryName {
+			case "A":
+				isErrQuery = false
+			case "B":
+				isErrQuery = true
+			default:
+				continue
+			}
 			for _, agg := range res.Aggregations {
 				for _, s := range agg.Series {
 					svc := serviceFromLabels(s.Labels)
@@ -108,10 +118,10 @@ func (c *Client) TrafficBuckets(ctx context.Context, w event.Window, step time.D
 						if pt.Partial || pt.Timestamp <= 0 || math.IsNaN(pt.Value) || math.IsInf(pt.Value, 0) {
 							continue
 						}
-						n := int(math.Round(pt.Value))
-						if n < 0 {
+						if pt.Value < 0 || pt.Value > float64(math.MaxInt/2) {
 							continue
 						}
+						n := int(math.Round(pt.Value))
 						k := slotKey{service: svc, tsMs: pt.Timestamp}
 						c := merged[k]
 						if c == nil {
@@ -141,7 +151,7 @@ func (c *Client) TrafficBuckets(ctx context.Context, w event.Window, step time.D
 	}
 	for svc := range out {
 		slices.SortFunc(out[svc], func(a, b TrafficBucket) int {
-			return cmp.Compare(a.Start.UnixNano(), b.Start.UnixNano())
+			return a.Start.Compare(b.Start)
 		})
 	}
 	return out, dedupeStrings(warns), nil
