@@ -1,0 +1,75 @@
+{
+  "status": "success",
+  "data": {
+    "type": "time_series",
+    "data": {
+      "results": [
+        {
+          "queryName": "A",
+          "aggregations": [
+            {
+              "index": 0,
+              "alias": "__result_0",
+              "series": [
+                {
+                  "labels": [
+                    {
+                      "key": { "name": "service.name" },
+                      "value": "storefront"
+                    }
+                  ],
+                  "values": [
+                    { "timestamp": 1795683600000, "value": 600 },
+                    { "timestamp": 1795683900000, "value": 612 },
+                    { "timestamp": 1795684200000, "value": 45, "partial": true }
+                  ]
+                },
+                {
+                  "labels": [
+                    {
+                      "key": { "name": "service.name" },
+                      "value": "wallet-service"
+                    }
+                  ],
+                  "values": [
+                    { "timestamp": 1795683600000, "value": 598 },
+                    { "timestamp": 1795683900000, "value": 610 }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "queryName": "B",
+          "aggregations": [
+            {
+              "index": 0,
+              "alias": "__result_0",
+              "series": [
+                {
+                  "labels": [
+                    {
+                      "key": { "name": "service.name" },
+                      "value": "wallet-service"
+                    }
+                  ],
+                  "values": [
+                    { "timestamp": 1795683600000, "value": 190 },
+                    { "timestamp": 1795683900000, "value": 205 }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "warning": {
+      "message": "query executed with warnings",
+      "warnings": [
+        { "message": "some field was resolved via fallback" }
+      ]
+    }
+  }
+}

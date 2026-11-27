@@ -1,0 +1,37 @@
+{
+  "status": "success",
+  "data": {
+    "type": "raw",
+    "data": {
+      "results": [
+        {
+          "queryName": "A",
+          "nextCursor": "",
+          "rows": [
+            {
+              "data": {
+                "id": "log-0001",
+                "timestamp": 1795683670550000000,
+                "trace_id": "aaaa0000000000000000000000000001",
+                "span_id": "span-wallet-server-1",
+                "severity_text": "ERROR",
+                "severity_number": 17,
+                "body": "request failed: mockpay rejected the charge: HTTP 402 AccountSuspended",
+                "resources_string": {
+                  "service.name": "wallet-service"
+                },
+                "attributes_string": {
+                  "payment.provider": "mockpay",
+                  "payment.provider.error_code": "AccountSuspended"
+                },
+                "attributes_number": {
+                  "http.response.status_code": 502
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
