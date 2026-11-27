@@ -176,7 +176,8 @@ func redactAWSKeyIDs(s string) string {
 // kept: file names (logo@2x.png), and the user@host of a remote, which is a
 // login name and a host rather than a mailbox: ssh://git@github.com/org/repo
 // (user info right after "://") and git@github.com:org/repo.git (followed by
-// ':' and a path). An address followed by ": " is still an address.
+// ':' and a path). Anything else after the ':' ("alice@example.com:443",
+// "...: thanks") leaves it an address.
 func redactEmails(s string) string {
 	matches := emailRe.FindAllStringIndex(s, -1)
 	if matches == nil {
@@ -209,8 +210,17 @@ func isRemoteLogin(s string, start, end int) bool {
 	if strings.HasSuffix(s[:start], "://") {
 		return true
 	}
-	return end+1 < len(s) && s[end] == ':' && s[end+1] != ' ' && s[end+1] != '\t' &&
-		s[end+1] != '\n' && s[end+1] != '\r'
+	// scp-style remote: user@host:path. A path is required (a '/' or a
+	// repository name ending in .git), so "alice@example.com:hunter2" and
+	// "bob@example.com:443" are still addresses.
+	if end >= len(s) || s[end] != ':' {
+		return false
+	}
+	rest := s[end+1:]
+	if i := strings.IndexAny(rest, " \t\r\n"); i >= 0 {
+		rest = rest[:i]
+	}
+	return strings.Contains(rest, "/") || strings.HasSuffix(rest, ".git")
 }
 
 // replaceMatches replaces submatch group of every match of re in s with
