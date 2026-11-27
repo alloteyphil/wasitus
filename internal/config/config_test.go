@@ -72,6 +72,17 @@ func TestParseDefaults(t *testing.T) {
 	if got := c.ChangesFilePath(); got != abs {
 		t.Errorf("ChangesFilePath() = %q, absolute path should be kept", got)
 	}
+	if got := c.RulesFilePath(); got != "" {
+		t.Errorf("RulesFilePath() = %q, want empty when unset", got)
+	}
+	absRules := filepath.Join(t.TempDir(), "rules.yaml")
+	c2, err := Parse([]byte("sources:\n  changes_file: '"+abs+"'\nrules_file: '"+absRules+"'\n"), "/ignored")
+	if err != nil {
+		t.Fatalf("Parse(abs rules_file) error = %v", err)
+	}
+	if got := c2.RulesFilePath(); got != absRules {
+		t.Errorf("RulesFilePath() = %q, absolute path should be kept", got)
+	}
 }
 
 func TestParseErrors(t *testing.T) {

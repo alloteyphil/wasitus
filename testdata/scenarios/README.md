@@ -7,7 +7,7 @@ offline through `httptest` servers by `cmd/wasitus/scenario_test.go`.
 Run all scenarios:
 
 ```
-go test ./... -run TestScenarios
+go test ./... -run TestScenario
 ```
 
 Run a single scenario (as documented in `docs/SCENARIOS.md`):

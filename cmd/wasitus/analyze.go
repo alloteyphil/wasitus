@@ -68,7 +68,8 @@ func analyzeIncident(
 	}
 
 	tcfg := traffic.DefaultConfig()
-	winBuckets, w2, err := client.TrafficBuckets(ctx, win, tcfg.BucketSize)
+	trafficWin := alignTrafficWindow(win, tcfg.BucketSize)
+	winBuckets, w2, err := client.TrafficBuckets(ctx, trafficWin, tcfg.BucketSize)
 	appendPrefixed(&out.Warnings, "signoz: ", w2)
 	if err != nil {
 		out.Failures = append(out.Failures, fmt.Errorf("signoz: window traffic: %w", err))
@@ -76,9 +77,11 @@ func analyzeIncident(
 
 	var baseBuckets map[string][]signoz.TrafficBucket
 	if len(winBuckets) > 0 {
+		// Include one extra bucket before day BaselineDays so traffic.Analyze
+		// has the n = -1 neighbor slot on the oldest baseline day.
 		baseWin := event.Window{
-			From: win.From.Add(-time.Duration(tcfg.BaselineDays) * 24 * time.Hour),
-			To:   win.From,
+			From: trafficWin.From.Add(-time.Duration(tcfg.BaselineDays)*24*time.Hour - tcfg.BucketSize),
+			To:   trafficWin.From,
 		}
 		var w3 []string
 		baseBuckets, w3, err = client.TrafficBuckets(ctx, baseWin, tcfg.BucketSize)
@@ -101,13 +104,21 @@ func analyzeIncident(
 
 	var baselineErrors map[fingerprint.Class]int
 	if trafficRes != nil && trafficRes.IsSpike && fpReport.Total > 0 && cfg.Lookback > 0 {
-		lbWin := event.Window{From: win.From.Add(-cfg.Lookback), To: win.From}
-		baseSamples, w4, err := client.ErrorSamples(ctx, lbWin)
-		appendPrefixed(&out.Warnings, "signoz: ", w4)
-		if err != nil {
-			out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline errors: %w", err))
-		} else if len(baseSamples) > 0 {
-			baselineErrors = classCounts(rs, baseSamples)
+		lbFrom := win.From.Add(-cfg.Lookback)
+		lbTo := win.From.Add(-time.Millisecond)
+		if lbTo.After(lbFrom) {
+			lbWin := event.Window{From: lbFrom, To: lbTo}
+			baseSamples, w4, err := client.ErrorSamples(ctx, lbWin)
+			appendPrefixed(&out.Warnings, "signoz: ", w4)
+			if err != nil {
+				out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline errors: %w", err))
+			}
+			// Keep partial samples (e.g., spans succeeded while logs failed) and
+			// exclude anything at or after win.From so window errors never leak into baseline.
+			filtered := filterBefore(baseSamples, win.From)
+			if len(filtered) > 0 {
+				baselineErrors = classCounts(rs, filtered)
+			}
 		}
 	}
 
@@ -140,14 +151,19 @@ func collectInternalHosts(
 	}
 	add := func(s string) {
 		s = strings.TrimSpace(s)
-		if s != "" {
-			seen[s] = true
+		// Reject empty names and leading-dot domain wildcards from untrusted event data.
+		if s == "" || strings.HasPrefix(s, ".") {
+			return
 		}
+		seen[s] = true
 	}
 	for _, svc := range cfg.Services {
 		add(svc)
 	}
 	for _, e := range events {
+		if e.Kind == event.KindExternal {
+			continue
+		}
 		add(e.Service)
 	}
 	for _, s := range samples {
@@ -160,6 +176,30 @@ func collectInternalHosts(
 		add(svc)
 	}
 	return slices.Sorted(maps.Keys(seen))
+}
+
+func filterBefore(in []signoz.ErrorSample, cutoff time.Time) []signoz.ErrorSample {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]signoz.ErrorSample, 0, len(in))
+	for _, s := range in {
+		if s.Time.Before(cutoff) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// alignTrafficWindow snaps w to whole step-wide UTC boundaries so partial edge
+// buckets do not dilute Factor when compared against full baseline slots.
+func alignTrafficWindow(w event.Window, step time.Duration) event.Window {
+	from := w.From.UTC().Truncate(step)
+	to := w.To.UTC().Truncate(step)
+	if !to.After(from) {
+		to = from.Add(step)
+	}
+	return event.Window{From: from, To: to}
 }
 
 func toFingerprintSamples(in []signoz.ErrorSample) []fingerprint.Sample {
