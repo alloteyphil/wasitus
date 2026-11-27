@@ -33,7 +33,8 @@ evidence-backed verdict on which side the cause sits.
 3. **Rules decide, AI only summarises.** See
    [ADR-0004](adr/0004-deterministic-verdict.md).
 4. **Every verdict is tested.** Each staged scenario in [SCENARIOS.md](SCENARIOS.md)
-   has a recorded fixture and an expected verdict that CI checks.
+   has a synthetic fixture (shaped like the lab, including cascades) and an
+   expected verdict that CI checks.
 5. **Scope discipline.** Anything not in the current milestone goes to the backlog.
 
 ## 3. Scope
@@ -121,7 +122,7 @@ timeline, and the collector tests run offline.
 - [x] Verdict engine combining change candidates and fingerprint evidence
 - [x] `UNKNOWN` when evidence is weak; confidence levels
 - [x] Markdown and JSON output; golden-file tests
-- [x] Scenario test suite: all scenarios in SCENARIOS.md pass from recorded fixtures
+- [x] Scenario test suite: all scenarios in SCENARIOS.md pass from synthetic fixtures
 
 **Done when:** 8/8 scenarios produce the expected verdict in CI.
 
@@ -153,7 +154,8 @@ without asking me anything.
   The history becomes part of the portfolio.
 - **Decisions written down.** Any choice with trade-offs gets an ADR in `docs/adr/`.
 - **Tests first for the logic.** Fingerprinting and verdict rules are table-driven
-  tests; renderers use golden files; collectors use record/replay.
+  tests; renderers use golden files; collectors use httptest fixtures shaped like
+  the APIs.
 - **Definition of done** for each task: tests, docs updated, CHANGELOG entry, CI
   green.
 - **Weekly note** in `docs/devlog/` (5 lines: what shipped, what I learned, what's

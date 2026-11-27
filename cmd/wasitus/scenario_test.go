@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,21 +17,27 @@ import (
 	"github.com/alloteyphil/wasitus/internal/render"
 )
 
+var dominantShareRE = regexp.MustCompile(`(?m)^(\d+)% of errors \(`)
+
 type scenarioFixture struct {
-	ID                         string                     `json:"id"`
-	Name                       string                     `json:"name"`
-	WindowFrom                 string                     `json:"window_from"`
-	WindowTo                   string                     `json:"window_to"`
-	ExpectedSide               string                     `json:"expected_side"`
-	ExpectedCause              string                     `json:"expected_cause"`
-	ExpectedLabel              string                     `json:"expected_label"`
-	ExpectedEvidenceSubstrings []string                   `json:"expected_evidence_substrings"`
-	ChangesYAML                string                     `json:"changes_yaml"`
-	GitHubDeployments          []json.RawMessage          `json:"github_deployments"`
-	SigNozAlerts               []scenarioAlert            `json:"signoz_alerts"`
-	ErrorSpans                 []scenarioSpanBatch        `json:"error_spans"`
-	LookbackErrorSpans         []scenarioSpanBatch        `json:"lookback_error_spans"`
-	Traffic                    map[string]scenarioTraffic `json:"traffic"`
+	ID                         string   `json:"id"`
+	Name                       string   `json:"name"`
+	WindowFrom                 string   `json:"window_from"`
+	WindowTo                   string   `json:"window_to"`
+	ExpectedSide               string   `json:"expected_side"`
+	ExpectedCause              string   `json:"expected_cause"`
+	ExpectedLabel              string   `json:"expected_label"`
+	ExpectedEvidenceSubstrings []string `json:"expected_evidence_substrings"`
+	// ExpectedMinDominantShare, when > 0, requires the "N% of errors" evidence
+	// line to report a share of at least this fraction (guards cascade dilution).
+	ExpectedMinDominantShare float64                    `json:"expected_min_dominant_share"`
+	ChangesYAML              string                     `json:"changes_yaml"`
+	GitHubDeployments        []json.RawMessage          `json:"github_deployments"`
+	SigNozAlerts             []scenarioAlert            `json:"signoz_alerts"`
+	ErrorSpans               []scenarioSpanBatch        `json:"error_spans"`
+	ErrorLogs                []scenarioSpanBatch        `json:"error_logs"`
+	LookbackErrorSpans       []scenarioSpanBatch        `json:"lookback_error_spans"`
+	Traffic                  map[string]scenarioTraffic `json:"traffic"`
 }
 
 type scenarioAlert struct {
@@ -200,6 +208,22 @@ func runScenarioCheck(t *testing.T, sc scenarioFixture) {
 			t.Errorf("%s (%s): evidence missing %q\ngot:\n%s", sc.ID, sc.Name, want, evidenceJoined)
 		}
 	}
+	if sc.ExpectedMinDominantShare > 0 {
+		m := dominantShareRE.FindStringSubmatch(evidenceJoined)
+		if m == nil {
+			t.Errorf("%s (%s): missing \"N%% of errors\" evidence line:\n%s", sc.ID, sc.Name, evidenceJoined)
+		} else {
+			pct, err := strconv.Atoi(m[1])
+			if err != nil {
+				t.Fatalf("%s: parse dominant share: %v", sc.ID, err)
+			}
+			got := float64(pct) / 100
+			if got+1e-9 < sc.ExpectedMinDominantShare {
+				t.Errorf("%s (%s): dominant share %.0f%% < required %.0f%% (cascade dilution too high):\n%s",
+					sc.ID, sc.Name, got*100, sc.ExpectedMinDominantShare*100, evidenceJoined)
+			}
+		}
+	}
 
 	// 2. Verify table and markdown formats also render cleanly and carry the verdict label.
 	for _, format := range []string{"table", "markdown"} {
@@ -223,6 +247,7 @@ func startScenarioSigNozServer(t *testing.T, sc scenarioFixture, winFrom, winTo 
 
 	allSpans := expandSpanBatches(sc.ID+"-win", sc.ErrorSpans)
 	allSpans = append(allSpans, expandSpanBatches(sc.ID+"-lb", sc.LookbackErrorSpans)...)
+	allLogs := expandSpanBatches(sc.ID+"-log", sc.ErrorLogs)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -264,7 +289,7 @@ func startScenarioSigNozServer(t *testing.T, sc scenarioFixture, winFrom, winTo 
 				signal = req.CompositeQuery.Queries[0].Spec.Signal
 			}
 			if signal == "logs" {
-				fmt.Fprint(w, `{"status":"success","data":{"type":"raw","data":{"results":[{"queryName":"A","rows":[]}]}}}`)
+				writeErrorLogsResponse(w, req.Start, req.End, allLogs)
 				return
 			}
 			writeErrorSpansResponse(w, req.Start, req.End, allSpans)
@@ -382,6 +407,16 @@ func writeErrorSpansResponse(w http.ResponseWriter, startMs, endMs int64, spans 
 		if s.ServerAddress != "" {
 			attrs["server.address"] = s.ServerAddress
 		}
+		events := []map[string]any{}
+		if s.ExceptionType != "" || s.Message != "" {
+			events = append(events, map[string]any{
+				"name": "exception",
+				"attributes": map[string]any{
+					"exception.type":    s.ExceptionType,
+					"exception.message": s.Message,
+				},
+			})
+		}
 		rowData := map[string]any{
 			"span_id":              s.ID,
 			"trace_id":             "tr-" + s.ID,
@@ -389,17 +424,57 @@ func writeErrorSpansResponse(w http.ResponseWriter, startMs, endMs int64, spans 
 			"response_status_code": s.HTTPStatus,
 			"resource":             map[string]any{"service.name": s.Service},
 			"attributes":           attrs,
-			"events": []map[string]any{{
-				"name": "exception",
-				"attributes": map[string]any{
-					"exception.type":    s.ExceptionType,
-					"exception.message": s.Message,
-				},
-			}},
+			"events":               events,
 		}
 		rows = append(rows, map[string]any{
 			"timestamp": s.Time.UTC().Format(time.RFC3339Nano),
 			"data":      rowData,
+		})
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status": "success",
+		"data": map[string]any{
+			"type": "raw",
+			"data": map[string]any{
+				"results": []map[string]any{{
+					"queryName": "A",
+					"rows":      rows,
+				}},
+			},
+		},
+	})
+}
+
+func writeErrorLogsResponse(w http.ResponseWriter, startMs, endMs int64, logs []syntheticSpan) {
+	var rows []map[string]any
+	for _, s := range logs {
+		ms := s.Time.UnixMilli()
+		if ms < startMs || ms > endMs {
+			continue
+		}
+		attrsNum := map[string]any{}
+		if s.HTTPStatus != "" {
+			if n, err := strconv.Atoi(s.HTTPStatus); err == nil {
+				attrsNum["http.response.status_code"] = n
+			}
+		}
+		attrsStr := map[string]any{}
+		if s.ServerAddress != "" {
+			attrsStr["server.address"] = s.ServerAddress
+		}
+		rows = append(rows, map[string]any{
+			"data": map[string]any{
+				"id":                "log-" + s.ID,
+				"timestamp":         s.Time.UnixNano(),
+				"trace_id":          "tr-" + s.ID,
+				"span_id":           s.ID,
+				"severity_text":     "ERROR",
+				"severity_number":   17,
+				"body":              s.Message,
+				"resources_string":  map[string]any{"service.name": s.Service},
+				"attributes_string": attrsStr,
+				"attributes_number": attrsNum,
+			},
 		})
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{

@@ -10,6 +10,7 @@
     "classified as account",
     "AccountSuspended"
   ],
+  "expected_min_dominant_share": 0.7,
   "signoz_alerts": [
     {
       "rule_id": "r-err",
@@ -22,18 +23,110 @@
   ],
   "error_spans": [
     {
-      "count": 15,
+      "count": 10,
       "start": "2026-11-26T09:00:10Z",
-      "step_seconds": 20,
+      "step_seconds": 25,
       "service": "wallet-service",
       "kind": "Client",
       "server_address": "mockpay",
       "http_status": "402",
       "exception_type": "*fmt.wrapError",
       "message": "mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:11Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "*fmt.wrapError",
+      "message": "payment for ord_000312 failed: HTTP 502 PaymentProviderError: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:12Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "*fmt.wrapError",
+      "message": "could not place the order: HTTP 502 PaymentFailed: payment for ord_000312 failed: HTTP 502 PaymentProviderError: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:13Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "kind": "Server",
+      "http_status": "502",
+      "exception_type": "",
+      "message": "HTTP 502"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:14Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "kind": "Client",
+      "server_address": "orders-service",
+      "http_status": "502",
+      "exception_type": "",
+      "message": "HTTP 502"
+    }
+  ],
+  "error_logs": [
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "http_status": "402",
+      "message": "request failed: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:10Z",
+      "step_seconds": 25,
+      "service": "wallet-service",
+      "http_status": "402",
+      "message": "HTTP 402"
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:11Z",
+      "step_seconds": 25,
+      "service": "orders-service",
+      "http_status": "502",
+      "message": "request failed: payment for ord_000312 failed: HTTP 502 PaymentProviderError: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
+    },
+    {
+      "count": 10,
+      "start": "2026-11-26T09:00:12Z",
+      "step_seconds": 25,
+      "service": "storefront",
+      "http_status": "502",
+      "message": "request failed: could not place the order: HTTP 502 PaymentFailed: payment for ord_000312 failed: HTTP 502 PaymentProviderError: mockpay rejected the charge: HTTP 402 AccountSuspended: This account is suspended because an invoice is overdue. Contact billing."
     }
   ],
   "traffic": {
-    "wallet-service": { "baseline_req": 600, "baseline_err": 0, "window_req": 600, "window_err": 600 }
+    "storefront": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    },
+    "orders-service": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    },
+    "wallet-service": {
+      "baseline_req": 600,
+      "baseline_err": 0,
+      "window_req": 600,
+      "window_err": 90
+    }
   }
 }

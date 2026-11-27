@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Scenario docs and fixtures: stop calling `testdata/scenarios/*` "recorded";
+  they are synthetic lab-shaped inputs. External scenarios (S2–S5, S7) now
+  include multi-service cascade spans and error logs so offline class share
+  matches live dilution (~78% dominant class with wrapper `HTTP 502`
+  ClassCode samples). CLAUDE.md: authoring agents must not merge their own PRs.
+
 ### Added
 - `wasitus timeline --from --to --config --timeout`: prints a timeline table for
   an incident window, including a configurable lookback before `--from`.

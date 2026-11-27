@@ -219,7 +219,7 @@ wasitus/
 │   ├── render/           # table, markdown, json
 │   └── golden/           # golden-file test helper
 ├── demo/                 # the lab: compose file, services, mockpay, scenarios
-├── testdata/             # recorded scenario fixtures (S1-S8)
+├── testdata/             # synthetic scenario fixtures (S1-S8)
 └── docs/                 # plan, architecture, scenarios, ADRs
 ```
 
@@ -232,9 +232,9 @@ Collectors depend on `event` only.
 | Layer | Approach |
 |---|---|
 | Fingerprint, traffic, correlate, verdict | table-driven unit tests |
-| Collectors | record/replay: API responses served by `httptest` |
+| Collectors | httptest fixtures shaped like SigNoz/GitHub API responses |
 | Renderers | golden files (`UPDATE_GOLDEN=1 go test ./...` to refresh) |
-| End to end | scenario suite: recorded lab incident in, expected verdict out (runs in CI) |
+| End to end | scenario suite: synthetic lab-shaped incident in, expected verdict out (CI) |
 | Live | `make lab-smoke` and `make scenario ID=S2` against the running lab |
 
 ## 11. Security and privacy

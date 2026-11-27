@@ -46,6 +46,10 @@ agents and reviewers.
 - A PR is merged only when `scripts/pr-green.sh <PR>` passes (every check green,
   `ci ok` and GitGuardian present, branch up to date with `main`) **and** an
   independent reviewer found no blocking problem.
+- The agent or person who authored a PR must not merge it. A subagent review
+  launched by that same authoring agent does not count as independent; a
+  separate human (or a separate session that did not write the PR) must approve,
+  then the owner or another integrator merges.
 - "No result" is never "green". Pending, skipped, cancelled or missing checks
   block the merge.
 - Merge with a merge commit (`gh pr merge --merge`) so each PR's commits stay in

@@ -136,7 +136,7 @@ start=$(now)
 say "scenario $id: starting"
 
 case "$id" in
-S1) # Bad deploy: a new orders-service version breaks 20% of orders.
+S1) # Bad deploy: a new orders-service version faults every 5th order (~20%).
   note orders-service "Deployed orders-service v1.4.0 (refactor order validation)" deploy
   deploy 1.4.0 5
   hold "$minutes"
