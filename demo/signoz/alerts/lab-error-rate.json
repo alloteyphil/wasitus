@@ -1,0 +1,114 @@
+{
+  "alert": "Lab service error rate above 5%",
+  "alertType": "TRACES_BASED_ALERT",
+  "description": "Share of a lab service's server spans that end in error (5xx or panic), averaged over 5 minutes, is above 5%.",
+  "ruleType": "threshold_rule",
+  "version": "v5",
+  "schemaVersion": "v2alpha1",
+  "condition": {
+    "compositeQuery": {
+      "queryType": "builder",
+      "panelType": "graph",
+      "unit": "percent",
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "traces",
+            "stepInterval": 60,
+            "disabled": true,
+            "aggregations": [
+              {
+                "expression": "count()"
+              }
+            ],
+            "filter": {
+              "expression": "deployment.environment.name = 'lab' AND kind_string = 'Server' AND has_error = true"
+            },
+            "groupBy": [
+              {
+                "name": "service.name",
+                "fieldContext": "resource",
+                "fieldDataType": "string"
+              }
+            ]
+          }
+        },
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "B",
+            "signal": "traces",
+            "stepInterval": 60,
+            "disabled": true,
+            "aggregations": [
+              {
+                "expression": "count()"
+              }
+            ],
+            "filter": {
+              "expression": "deployment.environment.name = 'lab' AND kind_string = 'Server'"
+            },
+            "groupBy": [
+              {
+                "name": "service.name",
+                "fieldContext": "resource",
+                "fieldDataType": "string"
+              }
+            ]
+          }
+        },
+        {
+          "type": "builder_formula",
+          "spec": {
+            "name": "F1",
+            "expression": "(A / B) * 100",
+            "legend": "{{service.name}}"
+          }
+        }
+      ]
+    },
+    "selectedQueryName": "F1",
+    "thresholds": {
+      "kind": "basic",
+      "spec": [
+        {
+          "name": "critical",
+          "op": "above",
+          "matchType": "on_average",
+          "target": 5,
+          "channels": []
+        }
+      ]
+    }
+  },
+  "evaluation": {
+    "kind": "rolling",
+    "spec": {
+      "evalWindow": "5m",
+      "frequency": "1m"
+    }
+  },
+  "notificationSettings": {
+    "groupBy": [
+      "service.name"
+    ],
+    "renotify": {
+      "enabled": false,
+      "interval": "30m",
+      "alertStates": [
+        "firing"
+      ]
+    },
+    "usePolicy": true
+  },
+  "labels": {
+    "severity": "critical",
+    "source": "wasitus-lab"
+  },
+  "annotations": {
+    "summary": "{{$service.name}} error rate above {{$threshold}}%",
+    "description": "{{$service.name}}: {{$value}}% of server spans ended in error over the last 5 minutes."
+  }
+}
