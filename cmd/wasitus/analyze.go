@@ -240,6 +240,10 @@ func classCounts(rs *fingerprint.RuleSet, samples []signoz.ErrorSample) map[fing
 	return counts
 }
 
+// minSpikeExpectedPerBucket is the least baseline traffic, in requests per
+// bucket, a service needs before its spike can count as a surge.
+const minSpikeExpectedPerBucket = 10
+
 // analyzeTraffic runs traffic.Analyze per service (so a spike on one entry
 // service is not diluted by quiet services) and returns the strongest spike,
 // or the highest-factor non-spike result when traffic was observed.
@@ -258,6 +262,12 @@ func analyzeTraffic(
 
 	for _, svc := range services {
 		res := traffic.Analyze(toTrafficBuckets(winBuckets[svc]), toTrafficBuckets(baseBuckets[svc]), cfg)
+		if res.IsSpike && res.ExpectedRequests < minSpikeExpectedPerBucket*res.WindowBuckets {
+			// A near-idle service (say 6 requests against 0 expected) gives a
+			// large factor from tiny numbers; it is not a surge.
+			res.IsSpike = false
+			res.Reason = fmt.Sprintf("%s (ignored: under %d expected requests per bucket)", res.Reason, minSpikeExpectedPerBucket)
+		}
 		if res.IsSpike {
 			if bestSpike == nil || res.Factor > bestSpike.Factor {
 				cp := res
@@ -310,6 +320,19 @@ func rankChanges(
 	}
 
 	targets := symptomTargets(events, fp, win)
+	// A change made after the incident had already started (a responder's
+	// rollback or hotfix) cannot have caused it, even if it came before a
+	// later cascaded symptom in another service.
+	start := targets[0].Start
+	for _, sym := range targets[1:] {
+		if sym.Start.Before(start) {
+			start = sym.Start
+		}
+	}
+	events = slices.DeleteFunc(slices.Clone(events), func(e event.Event) bool {
+		return e.Kind == event.KindChange && e.Time.After(start)
+	})
+
 	type changeKey struct {
 		id     string
 		source string
@@ -342,6 +365,10 @@ func rankChanges(
 	return out
 }
 
+// minSymptomShare is the least share of the window's errors a service needs
+// for its first error to count as a symptom when ranking changes.
+const minSymptomShare = 0.10
+
 // symptomTargets returns the earliest symptom time per failing service within
 // win (falling back to the earliest unattributed symptom or win.From).
 func symptomTargets(events []event.Event, fp fingerprint.Report, win event.Window) []correlate.Symptom {
@@ -360,7 +387,17 @@ func symptomTargets(events []event.Event, fp fingerprint.Report, win event.Windo
 			record(e.Service, e.Time)
 		}
 	}
+	// A service with only a stray error or two is not a failing service, so
+	// it must not pull in a change made to it (for example one wallet error
+	// right after a wallet config change, while orders is panicking).
+	perSvc := make(map[string]int)
 	for _, g := range fp.Groups {
+		perSvc[g.Service] += g.Count
+	}
+	for _, g := range fp.Groups {
+		if fp.Total > 0 && float64(perSvc[g.Service]) < minSymptomShare*float64(fp.Total) {
+			continue
+		}
 		record(g.Service, g.First)
 	}
 

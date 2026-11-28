@@ -153,6 +153,19 @@ score = 0.5 * time_proximity      # exp(-Δt / 15min): 5 min before ≈ 0.72, 60
 Weights are config, documented, and covered by tests. They are deliberately simple
 so a reader can check any result by hand.
 
+Two guards keep the wrong change from being blamed:
+
+- Only changes made at or before the incident's earliest symptom are candidates.
+  A rollback or hotfix made mid-incident cannot have caused it, even if it came
+  just before a later, cascaded symptom in another service.
+- A service counts as failing (and gets its own symptom) only if it has at least
+  10% of the window's errors, or an alert fired for it. One stray error must not
+  pull in an unrelated change to that service.
+
+A traffic spike on a service counts only if its baseline is at least 10 requests
+per 5-minute bucket, so a near-idle service going from 0 to 6 requests is not a
+"6x surge".
+
 ## 6. Verdict
 
 The verdict combines two kinds of evidence:
@@ -164,7 +177,7 @@ The verdict combines two kinds of evidence:
 |---|---|
 | ≥ 60% of errors are `code` and a change scores ≥ 0.6 | `OUR_SIDE / change` |
 | ≥ 60% of errors are `dependency` / `account` / `limit` / `expiry` | `EXTERNAL / <class>`, even if a deploy happened |
-| traffic far above baseline, error mix unchanged | `EXTERNAL / traffic` |
+| traffic far above baseline, error mix unchanged, error rate up by at most 2 points | `EXTERNAL / traffic` |
 | no class dominates, or evidence conflicts | `UNKNOWN` + the top candidates |
 | the window's error samples could not be read (query failed or timed out) | `UNKNOWN`, low confidence; partial counts are shown, not decided on |
 

@@ -13,6 +13,15 @@ All notable changes to this project are documented here. The format follows
   classes appeared". Missing error samples now give `UNKNOWN`; missing
   traffic, baseline errors, or change sources are named in the evidence and
   cap confidence at medium.
+- A retry storm after a bad deploy (traffic up, error rate from 0.1% to 16%,
+  same error mix) was called `EXTERNAL / traffic`; a pure surge now also needs
+  the error rate to stay within 2 points of baseline.
+- A near-idle service (0 to 6 requests) no longer counts as a traffic surge;
+  a spike needs at least 10 expected requests per bucket.
+- A rollback made mid-incident, or a change to a service with only a stray
+  error, could be blamed instead of the real deploy. Changes after the
+  earliest symptom are no longer candidates, and a service needs at least 10%
+  of the window's errors (or an alert) to count as failing.
 
 ## [0.1.0] - 2026-11-27
 
