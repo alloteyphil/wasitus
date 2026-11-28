@@ -734,10 +734,11 @@ func TestClientDecodingAndSizeLimit(t *testing.T) {
 	}
 
 	// Long API message truncation and control-character cleaning.
-	longMsg := strings.Repeat("a", 250) + "\n\t\x1b[31mred"
+	// It is cut at a word boundary, so it is at most 200 runes plus "...".
+	longMsg := strings.Repeat("abcd ", 50) + "\n\t\x1b[31mred"
 	body, _ := json.Marshal(map[string]string{"message": longMsg})
 	got := apiMessage(http.StatusBadGateway, body)
-	if !strings.HasSuffix(got, "...") || len([]rune(got)) != 203 {
+	if !strings.HasSuffix(got, "abcd...") || len([]rune(got)) > 203 || strings.ContainsAny(got, "\n\t\x1b") {
 		t.Errorf("apiMessage(long) = %q (len %d)", got, len([]rune(got)))
 	}
 	if clean("a\nb\tc\x00d") != "a b c d" {
@@ -745,6 +746,14 @@ func TestClientDecodingAndSizeLimit(t *testing.T) {
 	}
 	if got := c.resolveLink("://not-a-url"); got != "" {
 		t.Errorf("resolveLink(bad) = %q, want empty", got)
+	}
+	// Credentials in the base URL must never be copied into a link.
+	withUser, err := NewClient("https://admin:hunter2@signoz.example", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := withUser.resolveLink("/alerts/history?ruleId=1"); got != "https://signoz.example/alerts/history?ruleId=1" {
+		t.Errorf("resolveLink with user info = %q", got)
 	}
 	if got := dedupeStrings([]string{"", "a", "b", "a", ""}); len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Errorf("dedupeStrings() = %v", got)

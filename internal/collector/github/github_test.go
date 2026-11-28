@@ -513,9 +513,10 @@ func TestCollectErrors(t *testing.T) {
 			requests: 3,
 		},
 		{
-			name:     "long error message is shortened",
-			routes:   with(map[string]reply{repoPath + "/pulls": {status: http.StatusUnprocessableEntity, body: `{"message":"` + strings.Repeat("x", 300) + `"}`}}),
-			want:     []string{"HTTP 422: " + strings.Repeat("x", 200) + "..."},
+			name:   "long error message is shortened",
+			routes: with(map[string]reply{repoPath + "/pulls": {status: http.StatusUnprocessableEntity, body: `{"message":"` + strings.Repeat("word ", 60) + `"}`}}),
+			// Cut at a word boundary at or before 200 runes: 40 whole words.
+			want:     []string{"HTTP 422: " + strings.TrimSpace(strings.Repeat("word ", 40)) + "..."},
 			requests: 3,
 		},
 		{
