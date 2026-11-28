@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- A failed or timed-out source no longer produces a confident verdict as if
+  nothing had been found. Example: during a 10x traffic surge with every error
+  query failing, wasitus said `EXTERNAL / traffic` (high) with "no new error
+  classes appeared". Missing error samples now give `UNKNOWN`; missing
+  traffic, baseline errors, or change sources are named in the evidence and
+  cap confidence at medium.
+
 ## [0.1.0] - 2026-11-27
 
 ### Changed

@@ -19,6 +19,12 @@
 //     change scoring at least MinChangeScore. Top classes and change
 //     candidates are returned for human inspection.
 //
+// Missing inputs (Input.Missing) are never read as "nothing found". If the
+// window's error samples are missing, Decide returns UNKNOWN before any rule
+// above runs. If traffic, baseline errors, or a change source are missing,
+// the rules run on what was read, each gap is named in Evidence, and
+// confidence is capped at medium.
+//
 // Decide is a pure function with no I/O or clock access; the same input always
 // produces the same result and evidence lines.
 package verdict
