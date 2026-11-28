@@ -29,7 +29,7 @@ func Markdown(w io.Writer, t Timeline) error {
 		if len(t.Verdict.Evidence) > 0 {
 			b.WriteByte('\n')
 			for _, line := range t.Verdict.Evidence {
-				fmt.Fprintf(&b, "- %s\n", oneLine(line))
+				fmt.Fprintf(&b, "- %s\n", mdEscape(oneLine(line)))
 			}
 		}
 	}
@@ -50,8 +50,8 @@ func Markdown(w io.Writer, t Timeline) error {
 				service = "-"
 			}
 			title := mdEscape(oneLine(e.Title))
-			if link := strings.TrimSpace(e.Link); link != "" {
-				title = fmt.Sprintf("[%s](%s)", mdEscapeLinkText(title), mdEscapeURL(link))
+			if link := strings.TrimSpace(e.Link); isWebLink(link) {
+				title = fmt.Sprintf("[%s](%s)", title, mdEscapeURL(link))
 			}
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
 				e.Time.In(loc).Format(layout),
@@ -85,7 +85,7 @@ func Markdown(w io.Writer, t Timeline) error {
 	if len(t.Warnings) > 0 {
 		fmt.Fprintf(&b, "\n## Warnings\n\n")
 		for _, warn := range t.Warnings {
-			fmt.Fprintf(&b, "- %s\n", oneLine(warn))
+			fmt.Fprintf(&b, "- %s\n", mdEscape(oneLine(warn)))
 		}
 	}
 
@@ -93,13 +93,37 @@ func Markdown(w io.Writer, t Timeline) error {
 	return err
 }
 
-func mdEscape(s string) string {
-	return strings.ReplaceAll(s, "|", `\|`)
-}
+// mdEscape makes free text (titles, signatures, evidence, warnings) render
+// as literal text: a merged PR title must not add images, links, emphasis or
+// HTML to a pasted post-incident report. Underscores and '#' are left alone:
+// they are common in IDs and do nothing inside a word or mid-line.
+var mdEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	"|", `\|`,
+	"*", `\*`,
+	"`", "\\`",
+	"[", `\[`,
+	"]", `\]`,
+	"<", "&lt;",
+	">", "&gt;",
+)
 
-func mdEscapeLinkText(s string) string {
-	s = strings.ReplaceAll(s, "[", `\[`)
-	return strings.ReplaceAll(s, "]", `\]`)
+// placeholderUnescaper puts redaction placeholders back as they were: a
+// bare [email] is not followed by "(" so Markdown shows it literally.
+var placeholderUnescaper = strings.NewReplacer(
+	`\[email\]`, "[email]",
+	`\[phone\]`, "[phone]",
+	`\[card\]`, "[card]",
+	`\[token\]`, "[token]",
+)
+
+func mdEscape(s string) string { return placeholderUnescaper.Replace(mdEscaper.Replace(s)) }
+
+// isWebLink reports whether link is an http or https URL; anything else (a
+// javascript: link from a changes file, say) is shown as plain text.
+func isWebLink(link string) bool {
+	l := strings.ToLower(link)
+	return strings.HasPrefix(l, "https://") || strings.HasPrefix(l, "http://")
 }
 
 func mdEscapeURL(s string) string {
