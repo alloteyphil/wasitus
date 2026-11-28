@@ -33,3 +33,9 @@ services:                      # repository -> telemetry service name
   alloteyphil/wasitus: orders-service
 
 # rules_file: rules.local.yaml # optional extra fingerprint rules (relative to this file)
+
+# Hosts of our own systems that are not service names, so their failures
+# count as ours, not a third party's. Service names, hosts that start with a
+# service name (wallet-service.payments.svc.cluster.local) and private IPs
+# are already ours. A leading dot matches a whole domain.
+# internal_hosts: [billing-db, .corp.example]

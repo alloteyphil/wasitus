@@ -169,6 +169,13 @@ func collectInternalHosts(
 	for _, svc := range cfg.Services {
 		add(svc)
 	}
+	// internal_hosts comes from the operator's own config, so unlike event
+	// data it may name a whole domain (".corp.example").
+	for _, h := range cfg.InternalHosts {
+		if h = strings.TrimSpace(h); h != "" {
+			seen[h] = true
+		}
+	}
 	for _, e := range events {
 		if e.Kind == event.KindExternal {
 			continue

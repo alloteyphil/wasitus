@@ -223,6 +223,7 @@ services:                        # repo -> telemetry service name
   alloteyphil/wasitus: orders-service
 
 rules_file: ./rules.local.yaml   # optional extra fingerprint rules
+internal_hosts: [billing-db, .corp.example]  # optional: more of our own hosts
 ```
 
 ## 9. Code layout

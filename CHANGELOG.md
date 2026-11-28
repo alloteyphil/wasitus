@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `internal_hosts` config: extra hosts (or `.domain`s) of our own systems.
+
 ### Fixed
 - A failed or timed-out source no longer produces a confident verdict as if
   nothing had been found. Example: during a 10x traffic surge with every error
@@ -22,6 +25,13 @@ All notable changes to this project are documented here. The format follows
   error, could be blamed instead of the real deploy. Changes after the
   earliest symptom are no longer candidates, and a service needs at least 10%
   of the window's errors (or an alert) to count as failing.
+- Calls between our own services outside docker-compose were read as third
+  party, so our own failure came out `EXTERNAL / dependency`. Hosts whose
+  first DNS label is a service name (Kubernetes names) and private, loopback
+  and link-local IPs now count as ours.
+- A third party's 400 / 401 / 422 (it rejected what we sent) now counts as
+  code, not dependency. "not yet valid" alone ("coupon not yet valid") no
+  longer counts as certificate expiry.
 
 ## [0.1.0] - 2026-11-27
 
