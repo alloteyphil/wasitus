@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/alloteyphil/wasitus/internal/event"
+	"github.com/alloteyphil/wasitus/internal/redact"
 )
 
 const (
@@ -387,8 +388,6 @@ func apiMessage(code int, body []byte) string {
 	if msg == "" {
 		return http.StatusText(code)
 	}
-	if r := []rune(msg); len(r) > 200 {
-		msg = string(r[:200]) + "..."
-	}
+	msg = redact.Truncate(msg, 200) // word boundary, so redaction still recognises what is left
 	return msg
 }

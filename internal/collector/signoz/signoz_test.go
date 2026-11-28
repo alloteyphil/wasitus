@@ -734,10 +734,11 @@ func TestClientDecodingAndSizeLimit(t *testing.T) {
 	}
 
 	// Long API message truncation and control-character cleaning.
-	longMsg := strings.Repeat("a", 250) + "\n\t\x1b[31mred"
+	// It is cut at a word boundary, so it is at most 200 runes plus "...".
+	longMsg := strings.Repeat("abcd ", 50) + "\n\t\x1b[31mred"
 	body, _ := json.Marshal(map[string]string{"message": longMsg})
 	got := apiMessage(http.StatusBadGateway, body)
-	if !strings.HasSuffix(got, "...") || len([]rune(got)) != 203 {
+	if !strings.HasSuffix(got, "abcd...") || len([]rune(got)) > 203 || strings.ContainsAny(got, "\n\t\x1b") {
 		t.Errorf("apiMessage(long) = %q (len %d)", got, len([]rune(got)))
 	}
 	if clean("a\nb\tc\x00d") != "a b c d" {
