@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Long messages were cut before redaction, leaving fragments it could not
+  recognise ("alice.smith@exampl...", "4111 1111..."). They are now cut at a
+  word boundary, dropping trailing number groups.
+- Redaction now covers `key => 'value'`, `pwd` / `passphrase` /
+  `private_key` keys, PEM private keys, Slack / Stripe / Google keys, Slack
+  webhook paths, credentials in URL query strings, bracketed phone numbers
+  and MSISDNs without `+` (`00...`, African `2xx` country codes).
+- Event IDs and rule IDs are redacted in every output format.
+- `sources.signoz.url` may no longer contain `user:password@` (the error
+  never echoes it), and alert links never carry URL credentials.
+
 ## [0.1.0] - 2026-11-27
 
 ### Changed

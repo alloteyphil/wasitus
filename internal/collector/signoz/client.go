@@ -297,6 +297,7 @@ func (c *Client) resolveLink(raw string) string {
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Host != c.base.Host {
 		return ""
 	}
+	u.User = nil // never copy credentials into a link that ends up in output
 	return clean(u.String())
 }
 

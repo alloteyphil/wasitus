@@ -747,6 +747,14 @@ func TestClientDecodingAndSizeLimit(t *testing.T) {
 	if got := c.resolveLink("://not-a-url"); got != "" {
 		t.Errorf("resolveLink(bad) = %q, want empty", got)
 	}
+	// Credentials in the base URL must never be copied into a link.
+	withUser, err := NewClient("https://admin:hunter2@signoz.example", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := withUser.resolveLink("/alerts/history?ruleId=1"); got != "https://signoz.example/alerts/history?ruleId=1" {
+		t.Errorf("resolveLink with user info = %q", got)
+	}
 	if got := dedupeStrings([]string{"", "a", "b", "a", ""}); len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Errorf("dedupeStrings() = %v", got)
 	}

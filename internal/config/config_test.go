@@ -100,6 +100,7 @@ func TestParseErrors(t *testing.T) {
 		{"no sources", "timezone: UTC\n", []string{"no sources configured"}},
 		{"signoz without url", "sources:\n  signoz:\n    api_key_env: K\n", []string{"sources.signoz.url is required"}},
 		{"signoz bad scheme", "sources:\n  signoz:\n    url: ftp://x\n", []string{"must be an http or https URL"}},
+		{"signoz url with user info", "sources:\n  signoz:\n    url: https://admin:hunter2@signoz.example\n", []string{"must not contain user info"}},
 		{"signoz bad env name", "sources:\n  signoz:\n    url: http://x\n    api_key_env: my-key\n", []string{"not a valid environment variable name"}},
 		{"github without token", "sources:\n  github:\n    repos: [a/b]\n", []string{"sources.github.token_env is required"}},
 		{"github without repos", "sources:\n  github:\n    token_env: T\n", []string{"must list at least one repository"}},
@@ -118,6 +119,9 @@ func TestParseErrors(t *testing.T) {
 				if !strings.Contains(err.Error(), w) {
 					t.Errorf("Parse() error = %q, want it to contain %q", err, w)
 				}
+			}
+			if strings.Contains(err.Error(), "hunter2") {
+				t.Errorf("Parse() error leaks a password: %q", err)
 			}
 		})
 	}
