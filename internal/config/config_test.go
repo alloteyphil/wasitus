@@ -22,6 +22,7 @@ sources:
 services:
   alloteyphil/wasitus: orders-service
 rules_file: rules/custom.yaml
+internal_hosts: [billing-db, .corp.example]
 `
 
 func TestParseFullConfig(t *testing.T) {
@@ -31,6 +32,9 @@ func TestParseFullConfig(t *testing.T) {
 	}
 	if got := c.Location().String(); got != "Africa/Accra" {
 		t.Errorf("Location() = %q, want Africa/Accra", got)
+	}
+	if got := strings.Join(c.InternalHosts, ","); got != "billing-db,.corp.example" {
+		t.Errorf("InternalHosts = %q", got)
 	}
 	if c.Lookback != 30*time.Minute {
 		t.Errorf("Lookback = %s, want 30m", c.Lookback)
@@ -107,6 +111,8 @@ func TestParseErrors(t *testing.T) {
 		{"github bad repo", "sources:\n  github:\n    token_env: T\n    repos: [wasitus]\n", []string{`"wasitus" is not in owner/name form`}},
 		{"bad service key", ok + "services:\n  orders: orders-service\n", []string{`services: "orders" is not in owner/name form`}},
 		{"empty service name", ok + "services:\n  a/b: \"\"\n", []string{"maps to an empty service name"}},
+		{"blank internal host", ok + "internal_hosts: [\" \"]\n", []string{"internal_hosts"}},
+		{"internal host with a path", ok + "internal_hosts: [billing/api]\n", []string{`internal_hosts: "billing/api"`}},
 		{"several problems at once", "timezone: Mars/Base\nlookback: 48h\n", []string{"timezone", "lookback", "no sources"}},
 	}
 	for _, tt := range tests {

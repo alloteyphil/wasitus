@@ -134,7 +134,7 @@ timeline, and the collector tests run offline.
 - [x] Design write-up / blog post: "Was it us? Telling our failures from someone
       else's" ([docs/writeups/was-it-us.md](writeups/was-it-us.md))
 - [x] Add the project to the portfolio site (`../portfolio`)
-- [x] Share drafts: LinkedIn + SigNoz/OTel blurbs
+- [x] Share draft: SigNoz/OTel community blurb
       ([docs/devlog/2026-11-27-v0.1-ship.md](devlog/2026-11-27-v0.1-ship.md))
       — posting is manual
 

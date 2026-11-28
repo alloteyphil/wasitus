@@ -6,7 +6,9 @@
 // Precedence (with DefaultConfig):
 //
 //  1. Traffic surge (EXTERNAL / traffic): traffic is a confirmed spike against
-//     baseline and the error mix is unchanged (including zero errors).
+//     baseline, the error mix is unchanged (including zero errors), and the
+//     error rate rose by at most SurgeMaxErrorRateIncrease (2 points), so a
+//     retry storm after a bad deploy is not mistaken for a surge.
 //  2. External error class (EXTERNAL / account | limit | expiry | dependency):
 //     at least MinErrorSamples errors exist and one external class holds at
 //     least DominanceShare (60%) of all errors — even if a recent deploy
@@ -18,6 +20,12 @@
 //     no class dominates (scenario S8), or code errors occurred with no
 //     change scoring at least MinChangeScore. Top classes and change
 //     candidates are returned for human inspection.
+//
+// Missing inputs (Input.Missing) are never read as "nothing found". If the
+// window's error samples are missing, Decide returns UNKNOWN before any rule
+// above runs. If traffic, baseline errors, or a change source are missing,
+// the rules run on what was read, each gap is named in Evidence, and
+// confidence is capped at medium.
 //
 // Decide is a pure function with no I/O or clock access; the same input always
 // produces the same result and evidence lines.

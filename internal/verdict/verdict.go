@@ -59,6 +59,42 @@ type Input struct {
 	// baseline period, used with traffic.ErrorMixStable to distinguish a pure
 	// traffic surge (S6) from a spike that triggered new failure modes (S4).
 	BaselineErrors map[fingerprint.Class]int
+
+	// Missing records inputs whose source failed or timed out. Decide never
+	// reads a missing input as "nothing found": it returns UNKNOWN when the
+	// error samples are missing, and otherwise names each gap in Evidence and
+	// caps confidence at medium.
+	Missing Missing
+}
+
+// Missing flags inputs that could not be read, so their zero values mean
+// "unknown" rather than "none observed".
+type Missing struct {
+	Errors         bool // window error samples (spans or logs) were not fully read
+	Traffic        bool // window or baseline traffic was not fully read
+	BaselineErrors bool // the error mix before the window was not fully read
+	Changes        bool // at least one change source (GitHub, changes file) failed
+}
+
+// Any reports whether any input is missing.
+func (m Missing) Any() bool {
+	return m.Errors || m.Traffic || m.BaselineErrors || m.Changes
+}
+
+// evidence returns one line per missing input other than Errors, which
+// decideMissingErrors reports itself.
+func (m Missing) evidence() []string {
+	var ev []string
+	if m.Traffic {
+		ev = append(ev, "traffic could not be read, so a traffic surge was not checked")
+	}
+	if m.BaselineErrors {
+		ev = append(ev, "the error mix before the window could not be read, so a pure traffic surge could not be confirmed")
+	}
+	if m.Changes {
+		ev = append(ev, "a change source could not be read, so recent changes may be missing")
+	}
+	return ev
 }
 
 // ClassShare is one cause class's share of total error samples.
@@ -109,11 +145,36 @@ func Decide(in Input, cfg Config) Result {
 	candidates := sortedCandidates(in.Candidates)
 	classes := rankClasses(in.Errors)
 
+	// Without the window's errors, neither the class shares nor "no new error
+	// classes" can be trusted, so no rule below may decide.
+	if in.Missing.Errors {
+		return decideMissingErrors(in, candidates, classes)
+	}
+	return withMissing(decide(in, candidates, classes, cfg), in.Missing)
+}
+
+// withMissing names each missing input in r's Evidence and caps confidence at
+// medium, because a missing input could have changed the verdict.
+func withMissing(r Result, m Missing) Result {
+	if !m.Any() {
+		return r
+	}
+	r.Evidence = append(r.Evidence, m.evidence()...)
+	if r.Confidence == ConfidenceHigh {
+		r.Confidence = ConfidenceMedium
+	}
+	return r
+}
+
+func decide(in Input, candidates []correlate.Candidate, classes []ClassShare, cfg Config) Result {
 	// 1. Traffic surge: confirmed spike with unchanged error mix (S6).
 	// Checked before error classes so steady background errors scaled up by
 	// traffic do not mask the surge, while new failure modes (S4 rate limits)
 	// fail ErrorMixStable and fall through to the external class rules below.
-	if in.Traffic != nil && in.Traffic.IsSpike && errorMixStable(in, cfg.MixTolerance) {
+	// The error rate must also stay near baseline: a retry storm after a bad
+	// deploy raises traffic and errors together while keeping the same mix.
+	if in.Traffic != nil && in.Traffic.IsSpike && errorMixStable(in, cfg.MixTolerance) &&
+		errorRateSteady(in.Traffic, cfg.SurgeMaxErrorRateIncrease) {
 		return decideTrafficSurge(in, candidates, classes, cfg)
 	}
 
@@ -150,6 +211,8 @@ func decideTrafficSurge(in Input, candidates []correlate.Candidate, classes []Cl
 		ev = append(ev, fmt.Sprintf("error mix stayed within %s of baseline across %d error sample(s)",
 			pct(cfg.MixTolerance), in.Errors.Total))
 	}
+	ev = append(ev, fmt.Sprintf("error rate %.1f%% vs %.1f%% at baseline",
+		in.Traffic.WindowErrorRate*100, in.Traffic.BaselineErrorRate*100))
 	if len(candidates) > 0 && candidates[0].Score+shareEpsilon >= cfg.MinChangeScore {
 		ev = append(ev, notBlamedChangeLine(candidates[0], "traffic surged with an unchanged error mix"))
 	}
@@ -188,7 +251,7 @@ func decideExternalClass(
 	if len(candidates) > 0 && candidates[0].Score+shareEpsilon >= cfg.MinChangeScore {
 		ev = append(ev, notBlamedChangeLine(candidates[0],
 			fmt.Sprintf("%s of errors are %s failures", pct(top.Share), top.Class)))
-	} else if len(candidates) == 0 {
+	} else if len(candidates) == 0 && !in.Missing.Changes {
 		ev = append(ev, "no changes recorded in the lookback window")
 	}
 
@@ -236,9 +299,12 @@ func decideCodeClass(
 		}
 	}
 
-	if len(candidates) == 0 {
+	switch {
+	case len(candidates) == 0 && in.Missing.Changes:
+		ev = append(ev, "no readable change to attribute the code errors to")
+	case len(candidates) == 0:
 		ev = append(ev, "no changes in the lookback window to attribute the code errors to")
-	} else {
+	default:
 		ev = append(ev, fmt.Sprintf("best change candidate %q scored %.2f, below the %.2f threshold",
 			candidates[0].Change.Title, candidates[0].Score, cfg.MinChangeScore))
 	}
@@ -271,12 +337,7 @@ func decideUnknown(in Input, candidates []correlate.Candidate, classes []ClassSh
 			pct(cfg.DominanceShare), strings.Join(parts, ", "), in.Errors.Total))
 	}
 
-	if len(candidates) == 0 {
-		ev = append(ev, "no changes recorded in the lookback window")
-	} else {
-		ev = append(ev, fmt.Sprintf("top change candidate: %s (score %.2f)",
-			candidates[0].Change.Title, candidates[0].Score))
-	}
+	ev = append(ev, candidateLine(in, candidates)...)
 
 	return Result{
 		Side:       SideUnknown,
@@ -284,6 +345,42 @@ func decideUnknown(in Input, candidates []correlate.Candidate, classes []ClassSh
 		Evidence:   ev,
 		Candidates: topN(candidates, maxCandidates),
 		TopClasses: classes,
+	}
+}
+
+// decideMissingErrors returns UNKNOWN when the window's error samples could
+// not be fully read. Partial counts are shown for a human, never decided on.
+func decideMissingErrors(in Input, candidates []correlate.Candidate, classes []ClassShare) Result {
+	ev := []string{"error samples could not be read completely, so no verdict is given"}
+	if len(classes) > 0 {
+		ev = append(ev, fmt.Sprintf("partial data only: %s of %d readable error sample(s) classified as %s",
+			pct(classes[0].Share), in.Errors.Total, classes[0].Class))
+	}
+	if in.Traffic != nil && in.Traffic.Reason != "" {
+		ev = append(ev, in.Traffic.Reason)
+	}
+	ev = append(ev, candidateLine(in, candidates)...)
+	ev = append(ev, in.Missing.evidence()...)
+	return Result{
+		Side:       SideUnknown,
+		Confidence: ConfidenceLow,
+		Evidence:   ev,
+		Candidates: topN(candidates, maxCandidates),
+		TopClasses: classes,
+	}
+}
+
+// candidateLine names the top change candidate, or says there were none when
+// every change source was read.
+func candidateLine(in Input, candidates []correlate.Candidate) []string {
+	switch {
+	case len(candidates) > 0:
+		return []string{fmt.Sprintf("top change candidate: %s (score %.2f)",
+			candidates[0].Change.Title, candidates[0].Score)}
+	case in.Missing.Changes:
+		return nil // Missing.evidence says the change source failed
+	default:
+		return []string{"no changes recorded in the lookback window"}
 	}
 }
 
@@ -308,6 +405,12 @@ func errorMixStable(in Input, tolerance float64) bool {
 		}
 	}
 	return traffic.ErrorMixStable(baseCounts, winCounts, tolerance)
+}
+
+// errorRateSteady reports whether the window's error rate rose by no more
+// than maxIncrease (absolute) over the baseline's.
+func errorRateSteady(t *traffic.Result, maxIncrease float64) bool {
+	return t.WindowErrorRate <= t.BaselineErrorRate+maxIncrease+shareEpsilon
 }
 
 func externalCause(c fingerprint.Class) (Cause, bool) {

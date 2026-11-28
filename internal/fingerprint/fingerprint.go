@@ -55,7 +55,10 @@ type Options struct {
 	// "orders-service" or "localhost". A failed call to one of them is our
 	// own problem, not a third party's. Matching ignores case and ports. An
 	// entry that starts with a dot, such as ".svc.cluster.local", matches
-	// that domain and every host under it.
+	// that domain and every host under it. A host whose first DNS label is an
+	// exact entry ("orders-service.shop.svc.cluster.local" for
+	// "orders-service") also matches, and private, loopback and link-local
+	// IP addresses always count as ours.
 	InternalHosts []string
 }
 
@@ -111,7 +114,11 @@ func (rs *RuleSet) Classify(s Sample) (class Class, ruleID string) {
 			return rs.rules[i].class, rs.rules[i].id
 		}
 	}
-	if s.Outbound && !rs.internal.contains(in.peer) {
+	// A third party answering 4xx (400 bad request, 401 bad key, 422) is
+	// rejecting what we sent, usually after our own change; the rules above
+	// already catch the 4xx that mean their side (402 account, 429 limit,
+	// expired tokens). Only 5xx and failures with no status are theirs.
+	if s.Outbound && !rs.internal.contains(in.peer) && (s.HTTPStatus < 400 || s.HTTPStatus >= 500) {
 		return ClassDependency, FallbackOutbound
 	}
 	return ClassCode, FallbackOurs
@@ -218,6 +225,16 @@ func (hs hostSet) contains(host string) bool {
 		if host == suffix[1:] || strings.HasSuffix(host, suffix) {
 			return true
 		}
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		// Private, loopback and link-local addresses (pod and VPC IPs) are
+		// inside our own network.
+		return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+	}
+	// A cluster DNS name starts with the service name:
+	// "wallet-service.payments.svc.cluster.local" is wallet-service.
+	if label, _, ok := strings.Cut(host, "."); ok && hs.exact[label] {
+		return true
 	}
 	return false
 }
