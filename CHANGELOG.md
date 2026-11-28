@@ -6,7 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `internal_hosts` config: extra hosts (or `.domain`s) of our own systems.
+
 ### Fixed
+- A failed or timed-out source no longer produces a confident verdict as if
+  nothing had been found. Example: during a 10x traffic surge with every error
+  query failing, wasitus said `EXTERNAL / traffic` (high) with "no new error
+  classes appeared". Missing error samples now give `UNKNOWN`; missing
+  traffic, baseline errors, or change sources are named in the evidence and
+  cap confidence at medium.
+- A retry storm after a bad deploy (traffic up, error rate from 0.1% to 16%,
+  same error mix) was called `EXTERNAL / traffic`; a pure surge now also needs
+  the error rate to stay within 2 points of baseline.
+- A near-idle service (0 to 6 requests) no longer counts as a traffic surge;
+  a spike needs at least 10 expected requests per bucket.
+- A rollback made mid-incident, or a change to a service with only a stray
+  error, could be blamed instead of the real deploy. Changes after the
+  earliest symptom are no longer candidates, and a service needs at least 10%
+  of the window's errors (or an alert) to count as failing.
+- Calls between our own services outside docker-compose were read as third
+  party, so our own failure came out `EXTERNAL / dependency`. Hosts whose
+  first DNS label is a service name (Kubernetes names) and private, loopback
+  and link-local IPs now count as ours.
+- A third party's 400 / 401 / 422 (it rejected what we sent) now counts as
+  code, not dependency. "not yet valid" alone ("coupon not yet valid") no
+  longer counts as certificate expiry.
 - Markdown reports escape titles, signatures, evidence and warnings, so a PR
   title cannot add images, links, HTML or emphasis to a pasted report (and
   `<n>` placeholders are no longer swallowed as HTML tags). Only http(s)
@@ -16,6 +41,18 @@ All notable changes to this project are documented here. The format follows
 - Changes-file titles and services lose control characters (terminal escape
   sequences), and `link:` must be an http(s) URL.
 - `config.Parse` now has a fuzz test, as CLAUDE.md requires for parsers.
+
+### Security
+- Long messages were cut before redaction, leaving fragments it could not
+  recognise ("alice.smith@exampl...", "4111 1111..."). They are now cut at a
+  word boundary, dropping trailing number groups.
+- Redaction now covers `key => 'value'`, `pwd` / `passphrase` /
+  `private_key` keys, PEM private keys, Slack / Stripe / Google keys, Slack
+  webhook paths, credentials in URL query strings, bracketed phone numbers
+  and MSISDNs without `+` (`00...`, African `2xx` country codes).
+- Event IDs and rule IDs are redacted in every output format.
+- `sources.signoz.url` may no longer contain `user:password@` (the error
+  never echoes it), and alert links never carry URL credentials.
 
 ## [0.1.0] - 2026-11-27
 

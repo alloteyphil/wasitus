@@ -42,6 +42,10 @@
       - message_contains: "OptInRequired"
       - message_contains: "PaymentRequired"
       - message_contains: "payment required"
+      # Status alone counts even from our own service, because our services
+      # pass a provider's 402 back up the chain ("HTTP 402" logs in
+      # wallet-service). Known trade-off: a 402 our own code decided to send
+      # is also read as account. Override with a rules_file if that is you.
       - http_status: 402
 
 - id: account-access-denied
@@ -56,6 +60,9 @@
   class: limit
   match:
     any:
+      # Same trade-off as 402: our services relay a provider's 429, so status
+      # alone counts, and our own deliberate 429 (say after lowering our own
+      # limit) is also read as limit.
       - http_status: 429
       - message_contains: "RateLimited"
       - message_contains: "rate limit"     # rate limit exceeded, rate limited
@@ -86,7 +93,7 @@
       # store or configuration, so they fall through to the fallbacks.
       - message_contains: "certificate has expired"
       - message_contains: "certificate expired"
-      - message_contains: "not yet valid"
+      - message_contains: "certificate is not yet valid"   # bare "not yet valid" also matches "coupon not yet valid"
       - message_contains: "CERT_HAS_EXPIRED"
 
 - id: expiry-token-or-key

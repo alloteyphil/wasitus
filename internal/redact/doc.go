@@ -22,17 +22,28 @@
 //     letters or digits, and github_pat_ tokens.
 //   - AWS access key IDs: AKIA or ASIA followed by 16 upper-case letters or
 //     digits.
-//   - Secret key/value pairs: the value in key=value, key: value, "key":
-//     "value" and JSON-escaped \"key\":\"value\", where the key contains
-//     token, secret, password, passwd, api_key, apikey, api-key or
-//     authorization (any case). A leading HTTP auth scheme is kept
+//   - Other secrets with a known shape: PEM private key blocks (also when cut
+//     short after BEGIN), Slack xox[abprs]- tokens, Stripe sk_/rk_ live and
+//     test keys, Google AIza API keys, and Slack webhook paths.
+//   - Credentials in a URL query string: the value of X-Amz-Signature,
+//     X-Amz-Credential, X-Amz-Security-Token, X-Goog-Signature, sig,
+//     signature, key, api_key and access_token.
+//   - Secret key/value pairs: the value in key=value, key: value, key =>
+//     value, "key": "value" and JSON-escaped \"key\":\"value\", where the
+//     key contains token, secret, password, passwd, pwd, passphrase,
+//     private_key, api_key, apikey, api-key or authorization (any case).
+//     "pass" and "credentials" alone are not secret words: they are too
+//     common in prose (passed, invalid credentials). A leading HTTP auth scheme is kept
 //     ("Authorization: Basic [token]"). Keys right after '/' or '@' are host
 //     names or paths, not keys (https://secrets.lab:8200).
 //   - Email addresses, except file names that look like one (logo@2x.png).
 //   - Phone numbers: '+' then 7 to 15 digits (E.164), and national numbers
 //     with a trunk 0 then a non-zero digit, 10 or 11 digits in at most four
 //     groups (024 123 4567, 0244123456). Groups may be joined by single
-//     spaces, dashes or dots.
+//     spaces, dashes or dots. Also bracketed area codes ((024) 123 4567,
+//     +1 (415) 555-0100, +44 (0)20 7946 0958), and MSISDNs without '+' as
+//     mobile-money logs write them: 00 then 9 to 14 digits, or an African
+//     (2xx) country code then 8 to 10 digits (233241234567).
 //   - Card numbers: 13 to 19 digits starting with 2 to 9 that pass the Luhn
 //     check, ungrouped or as four digits then groups of three to six.
 //
@@ -53,8 +64,12 @@
 // Redaction is a safety net, not a guarantee:
 //   - Secrets with no known prefix and no secret-sounding key (a random API
 //     key alone in a sentence) are not found.
-//   - Phone numbers written without '+' and without a trunk 0, such as
-//     415-555-0100, are not found; neither are card numbers split by dots.
+//   - Phone numbers written without '+', a trunk 0 or brackets, such as
+//     415-555-0100, are not found, nor are bare numbers outside Africa
+//     (14155550100), because a bare 11-13 digit number is as likely an ID or
+//     a millisecond timestamp; card numbers split by dots or non-breaking
+//     spaces are missed too. Bare 2xx-prefixed 11-13 digit IDs are
+//     over-redacted as phone numbers.
 //   - An unquoted secret value ends at the first space, comma, semicolon,
 //     ampersand or quote.
 //   - Names, postal addresses and other personal data in prose are not

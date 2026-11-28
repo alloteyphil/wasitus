@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"unicode"
+
+	"github.com/alloteyphil/wasitus/internal/redact"
 )
 
 const (
@@ -251,9 +253,7 @@ func apiMessage(code int, body []byte) string {
 	if msg == "" {
 		return http.StatusText(code)
 	}
-	if r := []rune(msg); len(r) > 200 {
-		msg = string(r[:200]) + "..."
-	}
+	msg = redact.Truncate(msg, 200) // word boundary, so redaction still recognises what is left
 	return msg
 }
 
@@ -297,6 +297,7 @@ func (c *Client) resolveLink(raw string) string {
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Host != c.base.Host {
 		return ""
 	}
+	u.User = nil // never copy credentials into a link that ends up in output
 	return clean(u.String())
 }
 

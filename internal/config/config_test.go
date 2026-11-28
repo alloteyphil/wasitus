@@ -22,6 +22,7 @@ sources:
 services:
   alloteyphil/wasitus: orders-service
 rules_file: rules/custom.yaml
+internal_hosts: [billing-db, .corp.example]
 `
 
 func TestParseFullConfig(t *testing.T) {
@@ -31,6 +32,9 @@ func TestParseFullConfig(t *testing.T) {
 	}
 	if got := c.Location().String(); got != "Africa/Accra" {
 		t.Errorf("Location() = %q, want Africa/Accra", got)
+	}
+	if got := strings.Join(c.InternalHosts, ","); got != "billing-db,.corp.example" {
+		t.Errorf("InternalHosts = %q", got)
 	}
 	if c.Lookback != 30*time.Minute {
 		t.Errorf("Lookback = %s, want 30m", c.Lookback)
@@ -100,12 +104,15 @@ func TestParseErrors(t *testing.T) {
 		{"no sources", "timezone: UTC\n", []string{"no sources configured"}},
 		{"signoz without url", "sources:\n  signoz:\n    api_key_env: K\n", []string{"sources.signoz.url is required"}},
 		{"signoz bad scheme", "sources:\n  signoz:\n    url: ftp://x\n", []string{"must be an http or https URL"}},
+		{"signoz url with user info", "sources:\n  signoz:\n    url: https://admin:hunter2@signoz.example\n", []string{"must not contain user info"}},
 		{"signoz bad env name", "sources:\n  signoz:\n    url: http://x\n    api_key_env: my-key\n", []string{"not a valid environment variable name"}},
 		{"github without token", "sources:\n  github:\n    repos: [a/b]\n", []string{"sources.github.token_env is required"}},
 		{"github without repos", "sources:\n  github:\n    token_env: T\n", []string{"must list at least one repository"}},
 		{"github bad repo", "sources:\n  github:\n    token_env: T\n    repos: [wasitus]\n", []string{`"wasitus" is not in owner/name form`}},
 		{"bad service key", ok + "services:\n  orders: orders-service\n", []string{`services: "orders" is not in owner/name form`}},
 		{"empty service name", ok + "services:\n  a/b: \"\"\n", []string{"maps to an empty service name"}},
+		{"blank internal host", ok + "internal_hosts: [\" \"]\n", []string{"internal_hosts"}},
+		{"internal host with a path", ok + "internal_hosts: [billing/api]\n", []string{`internal_hosts: "billing/api"`}},
 		{"second yaml document", ok + "---\nlookback: 5m\n", []string{"only one YAML document"}},
 		{"several problems at once", "timezone: Mars/Base\nlookback: 48h\n", []string{"timezone", "lookback", "no sources"}},
 	}
@@ -119,6 +126,9 @@ func TestParseErrors(t *testing.T) {
 				if !strings.Contains(err.Error(), w) {
 					t.Errorf("Parse() error = %q, want it to contain %q", err, w)
 				}
+			}
+			if strings.Contains(err.Error(), "hunter2") {
+				t.Errorf("Parse() error leaks a password: %q", err)
 			}
 		})
 	}

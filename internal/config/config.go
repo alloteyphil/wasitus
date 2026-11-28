@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -27,6 +28,11 @@ type Config struct {
 	Sources   Sources           `yaml:"sources"`
 	Services  map[string]string `yaml:"services"` // repository (owner/name) -> telemetry service name
 	RulesFile string            `yaml:"rules_file"`
+	// InternalHosts are extra host names of our own systems ("billing-db", or
+	// ".corp.example" for a whole domain) whose failures are ours, not a
+	// third party's. Service names, hosts that start with a service name and
+	// private IP addresses are already treated as ours.
+	InternalHosts []string `yaml:"internal_hosts"`
 
 	location *time.Location
 	baseDir  string // directory of the config file; relative paths resolve against it
@@ -117,6 +123,10 @@ func (c *Config) validate() error {
 	if s.SigNoz != nil {
 		if s.SigNoz.URL == "" {
 			add("sources.signoz.url is required")
+		} else if strings.Contains(s.SigNoz.URL, "@") {
+			// Never echo the URL here: it may hold a password, and this
+			// message goes to stderr. Credentials belong in api_key_env.
+			add("sources.signoz.url must not contain user info (user:password@); put the API key in the variable named by api_key_env")
 		} else if u, err := url.Parse(s.SigNoz.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			add("sources.signoz.url %q must be an http or https URL", s.SigNoz.URL)
 		}
@@ -146,6 +156,11 @@ func (c *Config) validate() error {
 		}
 		if service == "" {
 			add("services: %q maps to an empty service name", repo)
+		}
+	}
+	for _, h := range c.InternalHosts {
+		if t := strings.TrimSpace(h); t == "" || t == "." || strings.ContainsAny(t, " \t/") {
+			add("internal_hosts: %q is not a host name or .domain", h)
 		}
 	}
 	return errors.Join(errs...)

@@ -223,13 +223,14 @@ func TestRedactionAcrossFormatsAndNoMutation(t *testing.T) {
 		Lookback: time.Hour,
 		Location: time.UTC,
 		Events: []event.Event{{
-			ID:     "e1",
-			Time:   at(14, 3, 5),
-			Kind:   event.KindSymptom,
-			Source: "signoz",
-			Title:  "Charge failed for " + rawEmail + " using " + rawToken,
-			Link:   "https://example.test/user/" + rawEmail,
-			Attrs:  map[string]string{"customer_email": rawEmail, "api_key": "secret-123"},
+			ID:      "signoz:errors:" + rawEmail + ":1", // IDs can embed a service name
+			Time:    at(14, 3, 5),
+			Kind:    event.KindSymptom,
+			Source:  "signoz",
+			Service: "svc-" + rawEmail,
+			Title:   "Charge failed for " + rawEmail + " using " + rawToken,
+			Link:    "https://example.test/user/" + rawEmail,
+			Attrs:   map[string]string{"customer_email": rawEmail, "api_key": "secret-123"},
 		}},
 		ErrorGroups: []ErrorGroup{{
 			Class:     "account",

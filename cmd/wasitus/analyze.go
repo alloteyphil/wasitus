@@ -49,7 +49,9 @@ func loadUserRules(cfg *config.Config) ([]byte, error) {
 // analyzeIncident runs stages 3–5 (fingerprinting, traffic spike detection,
 // change correlation, and verdict) using telemetry from sz. Non-fatal query
 // failures are returned in Failures so the timeline still renders with
-// exitPartial.
+// exitPartial, and each one is passed to the verdict as a missing input so it
+// is never read as "nothing found". changesMissing reports that a change
+// source (GitHub, changes file) failed during collection.
 func analyzeIncident(
 	ctx context.Context,
 	sz *signoz.Collector,
@@ -57,14 +59,17 @@ func analyzeIncident(
 	userRules []byte,
 	win event.Window,
 	events []event.Event,
+	changesMissing bool,
 ) analysisResult {
 	var out analysisResult
 	client := sz.Client()
+	missing := verdict.Missing{Changes: changesMissing}
 
 	samples, w1, err := client.ErrorSamples(ctx, win)
 	appendPrefixed(&out.Warnings, "signoz: ", w1)
 	if err != nil {
 		out.Failures = append(out.Failures, fmt.Errorf("signoz: error samples: %w", err))
+		missing.Errors = true
 	}
 
 	tcfg := traffic.DefaultConfig()
@@ -73,6 +78,7 @@ func analyzeIncident(
 	appendPrefixed(&out.Warnings, "signoz: ", w2)
 	if err != nil {
 		out.Failures = append(out.Failures, fmt.Errorf("signoz: window traffic: %w", err))
+		missing.Traffic = true
 	}
 
 	var baseBuckets map[string][]signoz.TrafficBucket
@@ -88,6 +94,7 @@ func analyzeIncident(
 		appendPrefixed(&out.Warnings, "signoz: ", w3)
 		if err != nil {
 			out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline traffic: %w", err))
+			missing.Traffic = true
 		}
 	}
 
@@ -112,6 +119,7 @@ func analyzeIncident(
 			appendPrefixed(&out.Warnings, "signoz: ", w4)
 			if err != nil {
 				out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline errors: %w", err))
+				missing.BaselineErrors = true
 			}
 			// Keep partial samples (e.g., spans succeeded while logs failed) and
 			// exclude anything at or after win.From so window errors never leak into baseline.
@@ -128,6 +136,7 @@ func analyzeIncident(
 		Candidates:     candidates,
 		Traffic:        trafficRes,
 		BaselineErrors: baselineErrors,
+		Missing:        missing,
 	}, verdict.DefaultConfig())
 
 	out.ErrorGroups = toRenderErrorGroups(fpReport.Groups)
@@ -159,6 +168,13 @@ func collectInternalHosts(
 	}
 	for _, svc := range cfg.Services {
 		add(svc)
+	}
+	// internal_hosts comes from the operator's own config, so unlike event
+	// data it may name a whole domain (".corp.example").
+	for _, h := range cfg.InternalHosts {
+		if h = strings.TrimSpace(h); h != "" {
+			seen[h] = true
+		}
 	}
 	for _, e := range events {
 		if e.Kind == event.KindExternal {
@@ -231,6 +247,10 @@ func classCounts(rs *fingerprint.RuleSet, samples []signoz.ErrorSample) map[fing
 	return counts
 }
 
+// minSpikeExpectedPerBucket is the least baseline traffic, in requests per
+// bucket, a service needs before its spike can count as a surge.
+const minSpikeExpectedPerBucket = 10
+
 // analyzeTraffic runs traffic.Analyze per service (so a spike on one entry
 // service is not diluted by quiet services) and returns the strongest spike,
 // or the highest-factor non-spike result when traffic was observed.
@@ -249,6 +269,12 @@ func analyzeTraffic(
 
 	for _, svc := range services {
 		res := traffic.Analyze(toTrafficBuckets(winBuckets[svc]), toTrafficBuckets(baseBuckets[svc]), cfg)
+		if res.IsSpike && res.ExpectedRequests < minSpikeExpectedPerBucket*res.WindowBuckets {
+			// A near-idle service (say 6 requests against 0 expected) gives a
+			// large factor from tiny numbers; it is not a surge.
+			res.IsSpike = false
+			res.Reason = fmt.Sprintf("%s (ignored: under %d expected requests per bucket)", res.Reason, minSpikeExpectedPerBucket)
+		}
 		if res.IsSpike {
 			if bestSpike == nil || res.Factor > bestSpike.Factor {
 				cp := res
@@ -301,6 +327,19 @@ func rankChanges(
 	}
 
 	targets := symptomTargets(events, fp, win)
+	// A change made after the incident had already started (a responder's
+	// rollback or hotfix) cannot have caused it, even if it came before a
+	// later cascaded symptom in another service.
+	start := targets[0].Start
+	for _, sym := range targets[1:] {
+		if sym.Start.Before(start) {
+			start = sym.Start
+		}
+	}
+	events = slices.DeleteFunc(slices.Clone(events), func(e event.Event) bool {
+		return e.Kind == event.KindChange && e.Time.After(start)
+	})
+
 	type changeKey struct {
 		id     string
 		source string
@@ -333,6 +372,10 @@ func rankChanges(
 	return out
 }
 
+// minSymptomShare is the least share of the window's errors a service needs
+// for its first error to count as a symptom when ranking changes.
+const minSymptomShare = 0.10
+
 // symptomTargets returns the earliest symptom time per failing service within
 // win (falling back to the earliest unattributed symptom or win.From).
 func symptomTargets(events []event.Event, fp fingerprint.Report, win event.Window) []correlate.Symptom {
@@ -351,7 +394,17 @@ func symptomTargets(events []event.Event, fp fingerprint.Report, win event.Windo
 			record(e.Service, e.Time)
 		}
 	}
+	// A service with only a stray error or two is not a failing service, so
+	// it must not pull in a change made to it (for example one wallet error
+	// right after a wallet config change, while orders is panicking).
+	perSvc := make(map[string]int)
 	for _, g := range fp.Groups {
+		perSvc[g.Service] += g.Count
+	}
+	for _, g := range fp.Groups {
+		if fp.Total > 0 && float64(perSvc[g.Service]) < minSymptomShare*float64(fp.Total) {
+			continue
+		}
 		record(g.Service, g.First)
 	}
 

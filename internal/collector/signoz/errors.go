@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alloteyphil/wasitus/internal/event"
+	"github.com/alloteyphil/wasitus/internal/redact"
 )
 
 const (
@@ -422,9 +423,9 @@ func formatErrorSummary(count int, example ErrorSample) string {
 	if detail == "" {
 		return fmt.Sprintf("%d %s", count, noun)
 	}
-	if r := []rune(detail); len(r) > 100 {
-		detail = string(r[:100]) + "..."
-	}
+	// Cut at a word boundary: a split email or card number would no longer
+	// be recognised by the redactor that runs at render time.
+	detail = redact.Truncate(detail, 100)
 	return fmt.Sprintf("%d %s (%s)", count, noun, detail)
 }
 

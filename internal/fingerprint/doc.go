@@ -117,9 +117,20 @@
 //     when a third-party peer is known: the server address of a client span,
 //     or a URL in the message. If messages are truncated before the URL,
 //     those errors fall back to code.
-//   - Host names. A service reached by IP address, or a client span with no
-//     server address and no URL, is treated as a third party unless the
-//     address is listed in Options.InternalHosts.
+//   - Host names. Our hosts are the InternalHosts entries (plus .domain
+//     suffixes), any host whose first DNS label is one of them (Kubernetes
+//     names like "wallet-service.payments.svc.cluster.local"), and private,
+//     loopback and link-local IPs. A public IP, or any other name, is a third
+//     party unless listed in config internal_hosts. The first-label match
+//     also makes "orders-service.someone-else.test" ours.
+//   - Status codes from our own services. Our services pass a provider's 402
+//     or 429 back up the chain, so status alone counts as account or limit
+//     even when our own service sent it; our own deliberate 429 is misread.
+//     A third party's other 4xx (400, 401, 422) means it rejected what we
+//     sent, so it counts as code, not dependency.
+//   - AccessDenied from a cloud provider after our own permissions change, and
+//     .NET System.Runtime.* exception types (read as Go runtime panics), are
+//     known misreads; a user rule can override them.
 //   - Words without a peer. "ServiceUnavailable", the account words and the
 //     limit words match whichever service reports them, because propagated
 //     provider errors carry no URL to check. Our own service returning

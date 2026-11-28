@@ -76,6 +76,9 @@ func redactTimeline(t Timeline) Timeline {
 	if len(t.Events) > 0 {
 		cp.Events = make([]event.Event, len(t.Events))
 		for i, e := range t.Events {
+			// IDs can embed service names or PR titles ("signoz:errors:<service>:..."),
+			// so they are redacted like any other text.
+			e.ID = r.String(e.ID)
 			e.Service = r.String(e.Service)
 			e.Title = r.String(e.Title)
 			e.Link = r.String(e.Link)
@@ -88,6 +91,7 @@ func redactTimeline(t Timeline) Timeline {
 		for i, g := range t.ErrorGroups {
 			g.Service = r.String(g.Service)
 			g.Signature = r.String(g.Signature)
+			g.RuleID = r.String(g.RuleID) // user rules files name their own rules
 			cp.ErrorGroups[i] = g
 		}
 	}
