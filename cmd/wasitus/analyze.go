@@ -49,7 +49,9 @@ func loadUserRules(cfg *config.Config) ([]byte, error) {
 // analyzeIncident runs stages 3–5 (fingerprinting, traffic spike detection,
 // change correlation, and verdict) using telemetry from sz. Non-fatal query
 // failures are returned in Failures so the timeline still renders with
-// exitPartial.
+// exitPartial, and each one is passed to the verdict as a missing input so it
+// is never read as "nothing found". changesMissing reports that a change
+// source (GitHub, changes file) failed during collection.
 func analyzeIncident(
 	ctx context.Context,
 	sz *signoz.Collector,
@@ -57,14 +59,17 @@ func analyzeIncident(
 	userRules []byte,
 	win event.Window,
 	events []event.Event,
+	changesMissing bool,
 ) analysisResult {
 	var out analysisResult
 	client := sz.Client()
+	missing := verdict.Missing{Changes: changesMissing}
 
 	samples, w1, err := client.ErrorSamples(ctx, win)
 	appendPrefixed(&out.Warnings, "signoz: ", w1)
 	if err != nil {
 		out.Failures = append(out.Failures, fmt.Errorf("signoz: error samples: %w", err))
+		missing.Errors = true
 	}
 
 	tcfg := traffic.DefaultConfig()
@@ -73,6 +78,7 @@ func analyzeIncident(
 	appendPrefixed(&out.Warnings, "signoz: ", w2)
 	if err != nil {
 		out.Failures = append(out.Failures, fmt.Errorf("signoz: window traffic: %w", err))
+		missing.Traffic = true
 	}
 
 	var baseBuckets map[string][]signoz.TrafficBucket
@@ -88,6 +94,7 @@ func analyzeIncident(
 		appendPrefixed(&out.Warnings, "signoz: ", w3)
 		if err != nil {
 			out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline traffic: %w", err))
+			missing.Traffic = true
 		}
 	}
 
@@ -112,6 +119,7 @@ func analyzeIncident(
 			appendPrefixed(&out.Warnings, "signoz: ", w4)
 			if err != nil {
 				out.Failures = append(out.Failures, fmt.Errorf("signoz: baseline errors: %w", err))
+				missing.BaselineErrors = true
 			}
 			// Keep partial samples (e.g., spans succeeded while logs failed) and
 			// exclude anything at or after win.From so window errors never leak into baseline.
@@ -128,6 +136,7 @@ func analyzeIncident(
 		Candidates:     candidates,
 		Traffic:        trafficRes,
 		BaselineErrors: baselineErrors,
+		Missing:        missing,
 	}, verdict.DefaultConfig())
 
 	out.ErrorGroups = toRenderErrorGroups(fpReport.Groups)

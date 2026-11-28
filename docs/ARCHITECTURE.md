@@ -166,9 +166,17 @@ The verdict combines two kinds of evidence:
 | ≥ 60% of errors are `dependency` / `account` / `limit` / `expiry` | `EXTERNAL / <class>`, even if a deploy happened |
 | traffic far above baseline, error mix unchanged | `EXTERNAL / traffic` |
 | no class dominates, or evidence conflicts | `UNKNOWN` + the top candidates |
+| the window's error samples could not be read (query failed or timed out) | `UNKNOWN`, low confidence; partial counts are shown, not decided on |
 
 Confidence (`high` / `medium` / `low`) comes from how dominant the class is and how
 much data supports it. Every verdict lists the evidence lines that produced it.
+
+A source that fails is never read as "nothing found". If traffic, the
+pre-window error mix, or a change source (GitHub, changes file) could not be
+read, the verdict still uses what was read, but its evidence names each gap
+(for example "a change source could not be read, so recent changes may be
+missing" instead of "no changes recorded") and confidence is capped at
+`medium`.
 
 The thresholds above are starting points; the scenario suite (SCENARIOS.md) is what
 tunes them.
