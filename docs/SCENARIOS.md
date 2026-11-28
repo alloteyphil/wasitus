@@ -37,6 +37,11 @@ all services ──► OpenTelemetry ──► SigNoz (local)
 S7 and S8 are the important ones. S7 proves the tool does not just blame the most
 recent deploy. S8 proves it admits when it does not know.
 
+S6 needs history: the traffic baseline wants data at the same time of day on at
+least 3 of the previous 7 days. On a freshly started lab, S6 correctly gives
+`UNKNOWN` ("too little history"); only a lab that has run for 3+ days, or the
+offline synthetic fixture, reaches `EXTERNAL / traffic`.
+
 ## Running and staging scenarios
 
 Run the offline synthetic scenario suite (as CI does):

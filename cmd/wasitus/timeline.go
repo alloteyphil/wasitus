@@ -89,7 +89,7 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 
 	var analysis analysisResult
 	if sz != nil && !hasFatalSigNozFailure(res.Failures) && ctx.Err() == nil {
-		analysis = analyzeIncident(ctx, sz, cfg, userRules, win, res.Events)
+		analysis = analyzeIncident(ctx, sz, cfg, userRules, win, res.Events, changeSourceFailed(res.Failures))
 	}
 
 	var warnings []string
@@ -143,6 +143,18 @@ func runTimeline(args []string, stdout, stderr io.Writer, now time.Time) int {
 func hasFatalSigNozFailure(failures []collector.Failure) bool {
 	for _, f := range failures {
 		if f.Collector == signoz.Source && (errors.Is(f.Err, signoz.ErrUnauthorized) || errors.Is(f.Err, signoz.ErrForbidden)) {
+			return true
+		}
+	}
+	return false
+}
+
+// changeSourceFailed reports whether any collector other than SigNoz (that is,
+// a source of change events such as GitHub or the changes file) failed, so the
+// verdict does not claim "no changes" when it could not read them.
+func changeSourceFailed(failures []collector.Failure) bool {
+	for _, f := range failures {
+		if f.Collector != signoz.Source {
 			return true
 		}
 	}
