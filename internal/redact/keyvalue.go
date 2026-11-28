@@ -7,12 +7,16 @@ import (
 
 var (
 	// secretNameRe finds the words that make a key name a secret.
-	secretNameRe = regexp.MustCompile(`(?i)token|secret|passw(?:or)?d|api[_-]?key|authorization`)
+	// "pass" alone is left out (passed, passenger, bypass), and so is
+	// "credentials", which is common in prose ("invalid credentials: user
+	// not found").
+	secretNameRe = regexp.MustCompile(`(?i)token|secret|passw(?:or)?d|pwd|passphrase|private[_-]?key|api[_-]?key|authorization`)
 
 	// secretKeyRe matches a key that names a secret, its optional closing
 	// quote (plain or JSON-escaped) and the separator, up to where the
-	// value starts: password=, "client_secret": , X-Api-Key: , \"token\":.
-	secretKeyRe = regexp.MustCompile(`(?i)[a-z0-9_.-]*(?:token|secret|passw(?:or)?d|api[_-]?key|authorization)[a-z0-9_.-]*(?:\\?["'])?[ \t]*[:=][ \t]*`)
+	// value starts: password=, "client_secret": , X-Api-Key: , \"token\":,
+	// and the Ruby/PHP/Perl style api_key => 'value'.
+	secretKeyRe = regexp.MustCompile(`(?i)[a-z0-9_.-]*(?:token|secret|passw(?:or)?d|pwd|passphrase|private[_-]?key|api[_-]?key|authorization)[a-z0-9_.-]*(?:\\?["'])?[ \t]*(?:=>|[:=])[ \t]*`)
 
 	// authSchemeRe matches an HTTP authentication scheme at the start of a
 	// value, which is kept: "Authorization: Basic [token]".

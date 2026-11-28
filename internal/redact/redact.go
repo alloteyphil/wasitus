@@ -36,9 +36,13 @@ func New() *Redactor {
 		redactJWTs,
 		redactGitHubTokens,
 		redactAWSKeyIDs,
+		redactKnownSecrets,
+		redactSecretQueries,
 		redactKeyValues,
 		redactEmails,
+		redactBracketPhones,
 		redactNumbers,
+		redactBareMSISDNs, // after redactNumbers, so card numbers are claimed first
 	}}
 }
 
@@ -110,6 +114,31 @@ var (
 	awsKeyIDRe = regexp.MustCompile(`\b(?:AKIA|ASIA)[A-Z0-9]{16}\b`)
 
 	emailRe = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
+
+	// Secrets with a well-known shape: PEM private keys (the whole block,
+	// or from BEGIN to the end of the text when it was cut short), Slack
+	// tokens, Stripe secret and restricted keys, Google API keys, and Slack
+	// incoming-webhook paths.
+	knownSecretRe = regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?s:.*?)-----END [A-Z ]*PRIVATE KEY-----|(?s:.*))` +
+		`|\bxox[abprs]-[A-Za-z0-9-]{10,}` +
+		`|\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{10,}` +
+		`|\bAIza[A-Za-z0-9_-]{35}` +
+		`|hooks\.slack\.com/services/[A-Za-z0-9/]+`)
+
+	// Credentials carried in a URL query string: signed-URL signatures
+	// (AWS, Azure SAS, GCS) and API keys or tokens. Group 1 is the value.
+	// Phone numbers with an area code in brackets: "(024) 123 4567",
+	// "+1 (415) 555-0100", "+44 (0)20 7946 0958". scanRun does not treat
+	// brackets as separators, so these need their own pattern.
+	bracketPhoneRe = regexp.MustCompile(`(?:\+\d{1,3}[ ]?)?\(\d{1,4}\)[ ]?\d{2,4}(?:[ -]\d{2,4}){1,3}\b`)
+
+	// MSISDNs written without '+', as mobile-money and telco logs do:
+	// "00233241234567", or an African country code (2xx) and 8 to 10 more
+	// digits, "233241234567". Other countries' bare numbers stay, because a
+	// bare 11-13 digit number is as likely an ID or a millisecond time.
+	bareMSISDNRe = regexp.MustCompile(`\b(?:00[1-9]\d{8,13}|2\d{2}[1-9]\d{7,9})\b`)
+
+	secretQueryRe = regexp.MustCompile(`(?i)[?&](?:x-amz-signature|x-amz-credential|x-amz-security-token|x-goog-signature|sig|signature|key|api_key|access_token)=([^&\s#"'<>]+)`)
 )
 
 // fileExtensions are "top-level domains" that show an email-like match is a
@@ -170,6 +199,32 @@ func redactGitHubTokens(s string) string {
 
 func redactAWSKeyIDs(s string) string {
 	return replaceMatches(s, awsKeyIDRe, 0, token, nil)
+}
+
+// redactBracketPhones replaces bracketed-area-code phone numbers with 7 to
+// 15 digits.
+func redactBracketPhones(s string) string {
+	return replaceMatches(s, bracketPhoneRe, 0, phone, func(m string) bool {
+		n := 0
+		for _, c := range m {
+			if c >= '0' && c <= '9' {
+				n++
+			}
+		}
+		return n < 7 || n > 15 // keep: too short or too long to be a phone
+	})
+}
+
+func redactBareMSISDNs(s string) string {
+	return replaceMatches(s, bareMSISDNRe, 0, phone, nil)
+}
+
+func redactKnownSecrets(s string) string {
+	return replaceMatches(s, knownSecretRe, 0, token, nil)
+}
+
+func redactSecretQueries(s string) string {
+	return replaceMatches(s, secretQueryRe, 1, token, nil)
 }
 
 // redactEmails replaces email addresses. Two things that look like one are
