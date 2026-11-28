@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `internal_hosts` config: extra hosts (or `.domain`s) of our own systems.
+
+### Fixed
+- Calls between our own services outside docker-compose were read as third
+  party, so our own failure came out `EXTERNAL / dependency`. Hosts whose
+  first DNS label is a service name (Kubernetes names) and private, loopback
+  and link-local IPs now count as ours.
+- A third party's 400 / 401 / 422 (it rejected what we sent) now counts as
+  code, not dependency. "not yet valid" alone ("coupon not yet valid") no
+  longer counts as certificate expiry.
+
 ## [0.1.0] - 2026-11-27
 
 ### Changed
