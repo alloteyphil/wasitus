@@ -205,3 +205,42 @@ func FuzzParse(f *testing.F) {
 		}
 	})
 }
+
+func TestParseRejectsUnsafeInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		yaml      string
+		wantError string
+	}{
+		{"second document", "- time: \"2026-11-14 03:00\"\n  title: a\n---\n- time: \"2026-11-14 04:00\"\n  title: b\n", "only one YAML document"},
+		{"javascript link", "- time: \"2026-11-14 03:00\"\n  title: a\n  link: \"javascript:alert(1)\"\n", "link must be an http or https URL"},
+		{"relative link", "- time: \"2026-11-14 03:00\"\n  title: a\n  link: /x\n", "link must be an http or https URL"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parse([]byte(tc.yaml), time.UTC); err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Errorf("parse() error = %v, want %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestParseStripsControlCharacters(t *testing.T) {
+	data := "- time: \"2026-11-14 03:00\"\n  title: \"Deploy\\e]0;pwned\\a done\\e[2J\"\n  service: \"orders\\nservice\"\n  link: https://example.test/x\n"
+	events, err := parse([]byte(data), time.UTC)
+	if err != nil || len(events) != 1 {
+		t.Fatalf("parse() = %v, %v", events, err)
+	}
+	e := events[0]
+	for _, s := range []string{e.Title, e.Service} {
+		if strings.ContainsAny(s, "\x1b\a\n") {
+			t.Errorf("control characters kept: %q", s)
+		}
+	}
+	if e.Title != "Deploy ]0;pwned  done [2J" || e.Service != "orders service" {
+		t.Errorf("title %q, service %q", e.Title, e.Service)
+	}
+	if e.Link != "https://example.test/x" {
+		t.Errorf("link = %q", e.Link)
+	}
+}

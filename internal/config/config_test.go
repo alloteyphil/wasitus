@@ -106,6 +106,7 @@ func TestParseErrors(t *testing.T) {
 		{"github bad repo", "sources:\n  github:\n    token_env: T\n    repos: [wasitus]\n", []string{`"wasitus" is not in owner/name form`}},
 		{"bad service key", ok + "services:\n  orders: orders-service\n", []string{`services: "orders" is not in owner/name form`}},
 		{"empty service name", ok + "services:\n  a/b: \"\"\n", []string{"maps to an empty service name"}},
+		{"second yaml document", ok + "---\nlookback: 5m\n", []string{"only one YAML document"}},
 		{"several problems at once", "timezone: Mars/Base\nlookback: 48h\n", []string{"timezone", "lookback", "no sources"}},
 	}
 	for _, tt := range tests {

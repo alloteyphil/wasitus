@@ -77,6 +77,11 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 		}
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
+	// A second YAML document (after ---) would otherwise be dropped silently.
+	var extra any
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("parse config: only one YAML document is allowed (found content after ---)")
+	}
 	c.baseDir = baseDir
 	if c.Timezone == "" {
 		c.Timezone = defaultTimezone

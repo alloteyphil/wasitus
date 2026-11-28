@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Markdown reports escape titles, signatures, evidence and warnings, so a PR
+  title cannot add images, links, HTML or emphasis to a pasted report (and
+  `<n>` placeholders are no longer swallowed as HTML tags). Only http(s)
+  links become links.
+- Config and changes files with a second YAML document (after `---`) are
+  rejected instead of silently dropping it.
+- Changes-file titles and services lose control characters (terminal escape
+  sequences), and `link:` must be an http(s) URL.
+- `config.Parse` now has a fuzz test, as CLAUDE.md requires for parsers.
+
 ## [0.1.0] - 2026-11-27
 
 ### Changed
