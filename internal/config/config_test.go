@@ -113,6 +113,7 @@ func TestParseErrors(t *testing.T) {
 		{"empty service name", ok + "services:\n  a/b: \"\"\n", []string{"maps to an empty service name"}},
 		{"blank internal host", ok + "internal_hosts: [\" \"]\n", []string{"internal_hosts"}},
 		{"internal host with a path", ok + "internal_hosts: [billing/api]\n", []string{`internal_hosts: "billing/api"`}},
+		{"second yaml document", ok + "---\nlookback: 5m\n", []string{"only one YAML document"}},
 		{"several problems at once", "timezone: Mars/Base\nlookback: 48h\n", []string{"timezone", "lookback", "no sources"}},
 	}
 	for _, tt := range tests {

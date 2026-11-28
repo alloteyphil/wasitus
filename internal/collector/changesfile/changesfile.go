@@ -25,6 +25,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"go.yaml.in/yaml/v3"
 
@@ -81,6 +82,11 @@ func parse(data []byte, loc *time.Location) ([]event.Event, error) {
 		}
 		return nil, fmt.Errorf("parse changes file: %w", err)
 	}
+	// A second YAML document (after ---) would otherwise be dropped silently.
+	var extra any
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("parse changes file: only one YAML document is allowed (found content after ---)")
+	}
 
 	events := make([]event.Event, 0, len(entries))
 	var errs []error
@@ -100,7 +106,7 @@ func (en entry) toEvent(loc *time.Location) (event.Event, error) {
 	if err != nil {
 		return event.Event{}, err
 	}
-	title := strings.TrimSpace(en.Title)
+	title := cleanText(en.Title)
 	if title == "" {
 		return event.Event{}, errors.New("missing title")
 	}
@@ -115,6 +121,10 @@ func (en entry) toEvent(loc *time.Location) (event.Event, error) {
 	if ct != "" && kind != event.KindChange {
 		return event.Event{}, errors.New("change_type is only valid when kind is change")
 	}
+	link := strings.TrimSpace(en.Link)
+	if l := strings.ToLower(link); link != "" && !strings.HasPrefix(l, "https://") && !strings.HasPrefix(l, "http://") {
+		return event.Event{}, fmt.Errorf("link must be an http or https URL, got %q", cleanText(link))
+	}
 	var attrs map[string]string
 	if ct != "" {
 		attrs = map[string]string{attrChangeType: ct}
@@ -124,12 +134,24 @@ func (en entry) toEvent(loc *time.Location) (event.Event, error) {
 		Time:     t,
 		Kind:     kind,
 		Source:   Source,
-		Service:  strings.TrimSpace(en.Service),
+		Service:  cleanText(en.Service),
 		Title:    title,
 		Severity: event.Severity(en.Severity), // empty becomes info; unknown values fail validation in the runner
-		Link:     en.Link,
+		Link:     link,
 		Attrs:    attrs,
 	}, nil
+}
+
+// cleanText trims s and replaces control characters (terminal escape
+// sequences, NUL, newlines) with spaces, as the SigNoz and GitHub collectors
+// do, so a title cannot rewrite the terminal or break a table row.
+func cleanText(s string) string {
+	return strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s))
 }
 
 // stableID gives an entry the same ID on every run, so re-reading the file

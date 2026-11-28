@@ -276,3 +276,42 @@ func TestRedactionAcrossFormatsAndNoMutation(t *testing.T) {
 		t.Error("Render mutated the caller's Timeline")
 	}
 }
+
+// TestMarkdownTreatsTextAsText checks that titles, evidence and warnings
+// cannot add images, links, HTML or emphasis to a pasted report, and that
+// only http(s) links become links.
+func TestMarkdownTreatsTextAsText(t *testing.T) {
+	tl := Timeline{
+		Window:   event.Window{From: at(14, 3, 0), To: at(14, 4, 0)},
+		Location: time.UTC,
+		Events: []event.Event{
+			{ID: "1", Time: at(14, 3, 1), Kind: event.KindChange, Source: "github",
+				Title: "![t](https://evil.test/x.png) <img src=x> **bold**", Link: "https://github.com/a/b/pull/1"},
+			{ID: "2", Time: at(14, 3, 2), Kind: event.KindExternal, Source: "changes-file",
+				Title: `ends with a backslash\`, Link: "javascript:alert(1)"},
+		},
+		Verdict:  &Verdict{Label: "UNKNOWN", Confidence: "low", Evidence: []string{"top change candidate: [x](https://evil.test)"}},
+		Warnings: []string{"<script>alert(1)</script>"},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, FormatMarkdown, tl); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, bad := range []string{"![t](", "<img", "**bold**", "<script>", "](javascript:", "[x](https://evil.test)"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("output contains live Markdown/HTML %q:\n%s", bad, out)
+		}
+	}
+	for _, want := range []string{
+		`!\[t\](https://evil.test/x.png)`, // the image becomes plain text
+		"&lt;img src=x&gt;",
+		`\*\*bold\*\*`,
+		`ends with a backslash\\`, // backslash escaped, no link built
+		"](https://github.com/a/b/pull/1)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+}

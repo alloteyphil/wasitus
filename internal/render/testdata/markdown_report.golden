@@ -7,7 +7,7 @@
 **EXTERNAL / account** (confidence: high)
 
 - 93% of errors (28/30) classified as account
-- top error group in wallet-service: mockpay rejected the charge: HTTP <n> AccountSuspended (28 occurrences, rule account-suspended)
+- top error group in wallet-service: mockpay rejected the charge: HTTP &lt;n&gt; AccountSuspended (28 occurrences, rule account-suspended)
 - recent change "Deploy orders-service v1.4.0" (score 0.82) was not blamed because 93% of errors are account failures
 
 ## Timeline
@@ -23,7 +23,7 @@
 
 | Class | Share | Count | Service | Signature |
 | --- | ---: | ---: | --- | --- |
-| account | 93% | 28 | wallet-service | mockpay rejected the charge: HTTP <n> AccountSuspended |
+| account | 93% | 28 | wallet-service | mockpay rejected the charge: HTTP &lt;n&gt; AccountSuspended |
 | code | 7% | 2 | - | unexpected nil \| empty body |
 
 ## Warnings

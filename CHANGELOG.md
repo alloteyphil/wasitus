@@ -32,6 +32,15 @@ All notable changes to this project are documented here. The format follows
 - A third party's 400 / 401 / 422 (it rejected what we sent) now counts as
   code, not dependency. "not yet valid" alone ("coupon not yet valid") no
   longer counts as certificate expiry.
+- Markdown reports escape titles, signatures, evidence and warnings, so a PR
+  title cannot add images, links, HTML or emphasis to a pasted report (and
+  `<n>` placeholders are no longer swallowed as HTML tags). Only http(s)
+  links become links.
+- Config and changes files with a second YAML document (after `---`) are
+  rejected instead of silently dropping it.
+- Changes-file titles and services lose control characters (terminal escape
+  sequences), and `link:` must be an http(s) URL.
+- `config.Parse` now has a fuzz test, as CLAUDE.md requires for parsers.
 
 ### Security
 - Long messages were cut before redaction, leaving fragments it could not
