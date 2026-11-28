@@ -6,7 +6,9 @@
 // Precedence (with DefaultConfig):
 //
 //  1. Traffic surge (EXTERNAL / traffic): traffic is a confirmed spike against
-//     baseline and the error mix is unchanged (including zero errors).
+//     baseline, the error mix is unchanged (including zero errors), and the
+//     error rate rose by at most SurgeMaxErrorRateIncrease (2 points), so a
+//     retry storm after a bad deploy is not mistaken for a surge.
 //  2. External error class (EXTERNAL / account | limit | expiry | dependency):
 //     at least MinErrorSamples errors exist and one external class holds at
 //     least DominanceShare (60%) of all errors — even if a recent deploy
