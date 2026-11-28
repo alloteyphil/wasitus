@@ -427,6 +427,7 @@ func TestConfigValidate(t *testing.T) {
 		HighConfidenceSamples:       0,
 		HighConfidenceChangeScore:   1.5,
 		HighConfidenceTrafficFactor: 1.0,
+		SurgeMaxErrorRateIncrease:   1.5,
 	}
 	err := bad.Validate()
 	if err == nil {
@@ -440,6 +441,7 @@ func TestConfigValidate(t *testing.T) {
 		"high confidence share",
 		"high confidence change score",
 		"high confidence traffic factor",
+		"surge max error rate increase",
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("Validate() error missing %q: %v", want, err)

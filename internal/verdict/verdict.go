@@ -171,7 +171,10 @@ func decide(in Input, candidates []correlate.Candidate, classes []ClassShare, cf
 	// Checked before error classes so steady background errors scaled up by
 	// traffic do not mask the surge, while new failure modes (S4 rate limits)
 	// fail ErrorMixStable and fall through to the external class rules below.
-	if in.Traffic != nil && in.Traffic.IsSpike && errorMixStable(in, cfg.MixTolerance) {
+	// The error rate must also stay near baseline: a retry storm after a bad
+	// deploy raises traffic and errors together while keeping the same mix.
+	if in.Traffic != nil && in.Traffic.IsSpike && errorMixStable(in, cfg.MixTolerance) &&
+		errorRateSteady(in.Traffic, cfg.SurgeMaxErrorRateIncrease) {
 		return decideTrafficSurge(in, candidates, classes, cfg)
 	}
 
@@ -208,6 +211,8 @@ func decideTrafficSurge(in Input, candidates []correlate.Candidate, classes []Cl
 		ev = append(ev, fmt.Sprintf("error mix stayed within %s of baseline across %d error sample(s)",
 			pct(cfg.MixTolerance), in.Errors.Total))
 	}
+	ev = append(ev, fmt.Sprintf("error rate %.1f%% vs %.1f%% at baseline",
+		in.Traffic.WindowErrorRate*100, in.Traffic.BaselineErrorRate*100))
 	if len(candidates) > 0 && candidates[0].Score+shareEpsilon >= cfg.MinChangeScore {
 		ev = append(ev, notBlamedChangeLine(candidates[0], "traffic surged with an unchanged error mix"))
 	}
@@ -400,6 +405,12 @@ func errorMixStable(in Input, tolerance float64) bool {
 		}
 	}
 	return traffic.ErrorMixStable(baseCounts, winCounts, tolerance)
+}
+
+// errorRateSteady reports whether the window's error rate rose by no more
+// than maxIncrease (absolute) over the baseline's.
+func errorRateSteady(t *traffic.Result, maxIncrease float64) bool {
+	return t.WindowErrorRate <= t.BaselineErrorRate+maxIncrease+shareEpsilon
 }
 
 func externalCause(c fingerprint.Class) (Cause, bool) {

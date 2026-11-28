@@ -43,6 +43,13 @@ type Config struct {
 	// HighConfidenceTrafficFactor is the minimum traffic spike factor for
 	// high confidence on EXTERNAL / traffic (> 1).
 	HighConfidenceTrafficFactor float64
+
+	// SurgeMaxErrorRateIncrease is how far the window's error rate (errors
+	// per request) may rise above the baseline's and still count as a pure
+	// traffic surge, as an absolute fraction in [0, 1]. A surge with an
+	// unchanged error mix but a jump in error rate (a retry storm after a bad
+	// deploy) is not a pure surge, so it falls through to the class rules.
+	SurgeMaxErrorRateIncrease float64
 }
 
 // DefaultConfig returns the documented starting thresholds from
@@ -57,6 +64,7 @@ func DefaultConfig() Config {
 		HighConfidenceSamples:       10,
 		HighConfidenceChangeScore:   0.75,
 		HighConfidenceTrafficFactor: 5.0,
+		SurgeMaxErrorRateIncrease:   0.02,
 	}
 }
 
@@ -88,6 +96,9 @@ func (c Config) Validate() error {
 	}
 	if invalidFloat(c.HighConfidenceTrafficFactor) || c.HighConfidenceTrafficFactor <= 1 {
 		add("high confidence traffic factor must be > 1, got %g", c.HighConfidenceTrafficFactor)
+	}
+	if invalidFloat(c.SurgeMaxErrorRateIncrease) || c.SurgeMaxErrorRateIncrease < 0 || c.SurgeMaxErrorRateIncrease > 1 {
+		add("surge max error rate increase must be in [0, 1], got %g", c.SurgeMaxErrorRateIncrease)
 	}
 	if len(errs) == 0 {
 		return nil
